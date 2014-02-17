@@ -1,0 +1,18 @@
+#!/bin/sh
+
+if [ ! -d "bin" ]; then
+   mkdir bin
+fi
+
+# Compile the source
+cd src
+make 
+make install INSTALL_DIR=..
+
+# Run all the tests
+cd ../pestrie_exp
+./run_tests
+
+
+
+
