@@ -362,18 +362,18 @@ ListAliases_by_representatives( BitQS *bitqs, int x, kvec_t(int) *es2baseptrs )
     res = qmats[I_ALIAS_MATRIX]->at(x);
 
     // We compute the result immediately
-    if ( slow_mode ) {
-      Cmatrix *ptm = qmats[I_PT_MATRIX];
-      bitmap ptx = ptm->at(x);
-      res = BITMAP_ALLOC(NULL);
+    // if ( res == NULL ) {
+    //   Cmatrix *ptm = qmats[I_PT_MATRIX];
+    //   bitmap ptx = ptm->at(x);
+    //   res = BITMAP_ALLOC(NULL);
       
-      Cmatrix *ptedm = qmats[I_PTED_MATRIX];
-      EXECUTE_IF_SET_IN_BITMAP( ptx, 0, o, bi ) {
-	bitmap_ior_into( res, ptedm->at(o) );
-      }
+    //   Cmatrix *ptedm = qmats[I_PTED_MATRIX];
+    //   EXECUTE_IF_SET_IN_BITMAP( ptx, 0, o, bi ) {
+    // 	bitmap_ior_into( res, ptedm->at(o) );
+    //   }
       
-      //qmats[I_ALIAS_MATRIX]->set(x, res);
-    }
+    //   qmats[I_ALIAS_MATRIX]->set(x, res);
+    // }
     
     // Extract the base pointers as the answer
     EXECUTE_IF_SET_IN_BITMAP( res, 0, q, bi ) {
@@ -381,21 +381,22 @@ ListAliases_by_representatives( BitQS *bitqs, int x, kvec_t(int) *es2baseptrs )
       ans += iterate_equivalent_set( ptrs );
     }
 
-    if ( slow_mode )
-      BITMAP_FREE( res );
+    // if ( slow_mode == true )
+    //   BITMAP_FREE(res);
   }
   
   return ans;
 }
 
 int
-ListAliases_by_pointers( BitQS *bitqs, int x, kvec_t(int) &pointers )
+ListAliases_by_pointers( BitQS *bitqs, int i, kvec_t(int) &pointers )
 {
   int ans = 0;
   unsigned q;
   bitmap_iterator bi;
   bitmap res;
 
+  int x = pointers[i];
   x = bitqs->pt_map[x];
 
   if ( x != -1 ) {
@@ -409,7 +410,7 @@ ListAliases_by_pointers( BitQS *bitqs, int x, kvec_t(int) &pointers )
       res = BITMAP_ALLOC(NULL);
 
       int size = pointers.size();
-      for ( int j = 0; j < size; ++j ) {
+      for ( int j = i + 1; j < size; ++j ) {
 	int y = pointers[j];
 	y = bitqs->pt_map[y];
 	if ( y == -1 ) continue;
@@ -425,7 +426,8 @@ ListAliases_by_pointers( BitQS *bitqs, int x, kvec_t(int) &pointers )
     
     // visit
     EXECUTE_IF_SET_IN_BITMAP( res, 0, q, bi ) {
-      ++ans;
+      if ( q >= 0 )
+	++ans;
     }
   }
   
@@ -591,29 +593,30 @@ execute_query_plan( BitQS *bitqs )
   
   fclose( fp );
 
-  n_query = pointers.size();
-  
+  int n_query = pointers.size();
   //fprintf( stderr, "Query plan loaded : %d entries.\n", n_query );
   show_res_use( NULL );
 
 
   // Execute
   for ( int i = 0; i < n_query; ++i ) {
-    x = pointers[i];
-    
     switch ( query_type ) {
     case IS_ALIAS:
-      // No difference in PesTrie case
-      for ( int j = i + 1; j < n_query; ++j ) {
-	y = pointers[j];
-	bool ans = IsAlias( bitqs, x, y );
-	if ( print_answers )
-	  printf( "(%d, %d) : %s\n", x, y, ans == true ? "true" : "false" );
+      {
+	x = pointers[i];
+	// No difference in PesTrie case
+	for ( int j = i + 1; j < n_query; ++j ) {
+	  y = pointers[j];
+	  bool ans = IsAlias( bitqs, x, y );
+	  if ( print_answers )
+	    printf( "(%d, %d) : %s\n", x, y, ans == true ? "true" : "false" );
+	}
       }
       break;
       
     case LIST_POINTS_TO:
       {
+	x = pointers[i];
 	int ans = ListPointsTo( bitqs, x );
 	if ( print_answers )
 	  printf( "%d : %d\n", x, ans );
@@ -624,9 +627,13 @@ execute_query_plan( BitQS *bitqs )
       {
 	int ans = 0;
 	
-	//ans = ListAliases_by_pointers( bitqs, x, pointers );
-	ans = ListAliases_by_representatives( bitqs, x, es2baseptrs );
-
+	if ( slow_mode )
+	  ans = ListAliases_by_pointers( bitqs, i, pointers );
+	else {
+	  x = pointers[i];
+	  ans = ListAliases_by_representatives( bitqs, x, es2baseptrs );
+	}
+	
 	if ( print_answers )
 	  printf( "%d : %d\n", x, ans );
       }
@@ -639,7 +646,7 @@ execute_query_plan( BitQS *bitqs )
 
 // We generate random pointers for evaluation
 void 
-execute_random_queries( BitQS *bitqs )
+traverse_result( BitQS *bitqs )
 {
   int x, y;
   int ans = 0;
@@ -652,32 +659,29 @@ execute_random_queries( BitQS *bitqs )
 
   int n = bitqs->n;
   int m = bitqs->m;
-  if ( index_type == SE_MATRIX ) n_query = n;
+  int n_query = ( query_type == LIST_POINTED_TO ? m : n );
 
   for ( int i = 0; i < n_query; ++i ) {   
     switch ( query_type ) {
     case IS_ALIAS:
       x = rand() % n; y = rand() % n;
-      IsAlias( bitqs, x, y );
+      ans += IsAlias( bitqs, x, y );
       break;
       
     case LIST_POINTS_TO:
-      x = rand() % n;
-      ListPointsTo( bitqs, x );
+      ans += ListPointsTo( bitqs, i );
       break;
       
     case LIST_POINTED_TO:
-      y = rand() % m;
-      ListPointedTo( bitqs, y );
+      ans += ListPointedTo( bitqs, i );
       break;
       
     case LIST_ALIASES:
-      x = rand() % n;
-      ListAliases_by_representatives( bitqs, x, NULL );
+      ans += ListAliases_by_representatives( bitqs, i, NULL );
       break;
   
     case LIST_ACC_VARS:
-      ans += ListModRefVars(bitqs, i);
+      ans += ans += ListModRefVars(bitqs, i);
       break;
       
     case LIST_CONFLICTS:
@@ -745,10 +749,7 @@ int main( int argc, char** argv )
        sanity_check( bitqs ) == false )
     return -1;
 
-  if ( query_plan != NULL )
-    execute_query_plan( bitqs );
-  else
-    execute_random_queries( bitqs );
+  query_plan != NULL ? execute_query_plan(bitqs) : traverse_result(bitqs);
   
   // if ( query_type == IS_ALIAS ) {
   //   long total = (long)n_query * (n_query -1);
@@ -756,7 +757,6 @@ int main( int argc, char** argv )
   // }
 
   delete bitqs;
-
 
   char buf[128];
   sprintf( buf, "%s querying (%s)", query_strs[query_type],
