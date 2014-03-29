@@ -40,7 +40,6 @@ PesTrieSelf::self_permute_rows()
 	}
 	
 	r_order[i].wt = wt;
-	r_order[i].n_pted_by = bitmap_count_bits( mat_T[i] );
       }
     }
     else if ( permute_way == SORT_BY_SIZE ) {

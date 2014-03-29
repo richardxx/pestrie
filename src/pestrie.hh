@@ -60,12 +60,11 @@ struct CrossEdgeRep
 struct MatrixRow
 {
   int id;
-  int n_pted_by;
   long wt;       // the weight of this row, used for row permutation 
   
   bool operator<( const MatrixRow& o ) const
   {
-    return n_pted_by == o.n_pted_by ? wt > o.wt : n_pted_by > o.n_pted_by;
+    return wt > o.wt;
   }
 };
 
