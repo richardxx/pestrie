@@ -28,7 +28,7 @@
 
 // Ways to sort the rows for PesTrie construction.
 #define SORT_BY_SIZE 0
-#define SORT_BY_AGGREGATE 1
+#define SORT_BY_HUB_DEGREE 1
 #define SORT_BY_RANDOM 2
 
 // Categories of matrices in points-to/side-effect bitmap index

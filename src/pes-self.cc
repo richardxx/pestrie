@@ -30,7 +30,7 @@ PesTrieSelf::self_permute_rows()
   int permute_way = this->pes_opts->permute_way;
 
   if ( permute_way != SORT_BY_RANDOM ) {
-    if ( permute_way == SORT_BY_AGGREGATE ) {      
+    if ( permute_way == SORT_BY_HUB_DEGREE ) {      
       for ( i = 0; i < cm; ++i ) {
 	long wt = 0;
 	EXECUTE_IF_SET_IN_BITMAP( mat_T[i], 0, x, bi ) {
@@ -40,6 +40,7 @@ PesTrieSelf::self_permute_rows()
 	}
 	
 	r_order[i].wt = wt;
+	r_order[i].n_pted_by = bitmap_count_bits( mat_T[i] );
       }
     }
     else if ( permute_way == SORT_BY_SIZE ) {

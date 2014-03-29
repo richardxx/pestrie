@@ -36,7 +36,7 @@ struct PesOpts
   {
     // Setup the default values
     input_format = INPUT_START_BY_SIZE;
-    permute_way = SORT_BY_AGGREGATE;
+    permute_way = SORT_BY_HUB_DEGREE;
     obj_merge = true;
     profile_in_detail = false;
     pestrie_draw = false;
@@ -60,11 +60,12 @@ struct CrossEdgeRep
 struct MatrixRow
 {
   int id;
+  int n_pted_by;
   long wt;       // the weight of this row, used for row permutation 
   
   bool operator<( const MatrixRow& o ) const
   {
-    return wt > o.wt;
+    return n_pted_by == o.n_pted_by ? wt > o.wt : n_pted_by > o.n_pted_by;
   }
 };
 
