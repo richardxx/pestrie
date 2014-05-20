@@ -9,7 +9,7 @@
 #define BIT_INDEX_H
 
 #include <cstdio>
-#include "matrix_ops.hh"
+#include "matrix-ops.hh"
 
 struct BitIndexer;
 

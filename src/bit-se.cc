@@ -5,8 +5,8 @@
  */
 
 #include <assert.h>
-#include "matrix_ops.hh"
-#include "bit_index.hh"
+#include "matrix-ops.hh"
+#include "bit-index.hh"
 #include "profile_helper.h"
 #include "options.h"
 

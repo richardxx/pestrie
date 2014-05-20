@@ -14,7 +14,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <cstdlib>
-#include "bit_index.hh"
+#include "bit-index.hh"
 #include "options.h"
 #include "profile_helper.h"
 

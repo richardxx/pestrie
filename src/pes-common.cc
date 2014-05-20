@@ -13,7 +13,7 @@
 #include "histogram.hh"
 #include "pestrie.hh"
 #include "profile_helper.h"
-#include "matrix_ops.hh"
+#include "matrix-ops.hh"
 
 using namespace std;
 

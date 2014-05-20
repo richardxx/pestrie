@@ -6,7 +6,7 @@
 
 #include <cstring>
 #include <cstdlib>
-#include "matrix_ops.hh"
+#include "matrix-ops.hh"
 
 using namespace std;
 

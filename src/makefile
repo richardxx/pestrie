@@ -1,10 +1,10 @@
 CFLAGS = -w -Wall -O2
 BASIC_DEPS_H = bitmap.h profile_helper.h options.h 
 BASIC_DEPS_C = obstack.o bitmap.o profile_helper.o
-PESTRIE_DEPS_H = pestrie.hh segtree.hh treap.hh kvec.hh histogram.hh matrix_ops.hh
-PESTRIE_DEPS_C = segtree.o treap.o pes-common.o pes-self.o pes-dual.o matrix_ops.o
-BITINDEX_DEPS_H = matrix_ops.hh bit_index.hh
-BITINDEX_DEPS_C = matrix_ops.o bit_pt.o bit_se.o
+PESTRIE_DEPS_H = pestrie.hh segtree.hh treap.hh kvec.hh histogram.hh matrix-ops.hh
+PESTRIE_DEPS_C = segtree.o treap.o pes-common.o pes-self.o pes-dual.o matrix-ops.o
+BITINDEX_DEPS_H = matrix-ops.hh bit-index.hh
+BITINDEX_DEPS_C = matrix-ops.o bit-pt.o bit-se.o
 LIB = #-ltcmalloc
 CC = g++
 
@@ -40,14 +40,14 @@ pes-self.o : segtree.hh pes-self.cc
 pes-dual.o : segtree.hh pes-dual.cc
 	$(CC) pes-dual.cc $(CFLAGS) $(LIB) -c
 
-matrix_ops.o : matrix_ops.hh matrix_ops.cc
-	$(CC) matrix_ops.cc $(CFLAGS) $(LIB) -c
+matrix-ops.o : matrix-ops.hh matrix-ops.cc
+	$(CC) matrix-ops.cc $(CFLAGS) $(LIB) -c
 
-bit_pt.o : bit_pt.cc bit_index.hh
-	$(CC) bit_pt.cc $(CFLAGS) $(LIB) -c
+bit-pt.o : bit-pt.cc bit-index.hh
+	$(CC) bit-pt.cc $(CFLAGS) $(LIB) -c
 
-bit_se.o : bit_se.cc bit_index.hh
-	$(CC) bit_se.cc $(CFLAGS) $(LIB) -c
+bit-se.o : bit-se.cc bit-index.hh
+	$(CC) bit-se.cc $(CFLAGS) $(LIB) -c
 
 pesI: pes-indexer.cc  $(BASIC_DEPS_H) $(PESTRIE_DEPS_H) $(PESTRIE_DEPS_C) $(BASIC_DEPS_C)
 	$(CC) pes-indexer.cc $(PESTRIE_DEPS_C) $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o pesI
@@ -58,11 +58,11 @@ bitI: bit-indexer.cc $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(BITINDEX_DEPS_C) $(BITIND
 pesQ: pes-querier.cc treap.hh kvec.hh histogram.hh query.h $(BASIC_DEPS_H) $(BASIC_DEPS_C)
 	$(CC) pes-querier.cc $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o pesQ
 
-bitQ: bit-querier.cc query.h $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix_ops.o
+bitQ: bit-querier.cc query.h $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix-ops.o
 	$(CC) bit-querier.cc $(BITINDEX_DEPS_C) $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(CFLAGS) $(LIB) -o bitQ
 
-formatter: matrix_ops.hh matrix_ops.cc formatter.cc
-	$(CC) formatter.cc matrix_ops.o $(BASIC_DEPS_C) -o formatter
+formatter: matrix-ops.hh matrix-ops.cc formatter.cc
+	$(CC) formatter.cc matrix-ops.o $(BASIC_DEPS_C) -o formatter
 
 install:
 	cp pesI bitI pesQ bitQ $(INSTALL_DIR)/bin

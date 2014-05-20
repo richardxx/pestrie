@@ -5,7 +5,7 @@
  */
 
 #include <cstring>
-#include "bit_index.hh"
+#include "bit-index.hh"
 #include "profile_helper.h"
 #include "options.h"
 #include "histogram.hh"

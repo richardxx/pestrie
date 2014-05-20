@@ -13,10 +13,10 @@
 #include <set>
 #include "options.h"
 #include "profile_helper.h"
-#include "matrix_ops.hh"
+#include "matrix-ops.hh"
 #include "kvec.hh"
 #include "query.h"
-#include "bit_index.hh"
+#include "bit-index.hh"
 
 using namespace std;
 
@@ -709,7 +709,7 @@ sanity_check( BitQS *bitqs )
 					       INPUT_START_BY_SIZE );
   fclose( fp );
   
-  indexer->fp_generate_index( indexer );
+  indexer->fp_generate_index( indexer, true );
   
   // line by line compare
   Cmatrix **mat_set_query = bitqs->qmats;
