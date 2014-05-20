@@ -3,7 +3,6 @@
  * By richardxx, 2012.9
  */
 #include "treap.hh"
-#include <vector>
 
 using namespace std;
 

@@ -13,16 +13,24 @@
 using namespace std;
 
 static void
-generate_index( BitIndexer* se_indexer )
+generate_index( BitIndexer* se_indexer, bool merging_eqls )
 {
-  // obtain
+  // obtain the matrices
   Cmatrix **imats = se_indexer->imats;
   Cmatrix *m_store_T = imats[I_STORE_TRANS_MATRIX];
   Cmatrix *m_load_T = imats[I_LOAD_TRANS_MATRIX];
 
-  // prepare  
-  Cmatrix *m_store = compress_equivalent_columns( m_store_T );
-  Cmatrix *m_load = compress_equivalent_columns( m_load_T );
+  // prepare
+  Cmatrix *m_store = NULL, *m_load = NULL;
+  
+  if ( merging_eqls ) {
+    m_store = compress_equivalent_columns( m_store_T );
+    m_load = compress_equivalent_columns( m_load_T );
+  }
+  else {
+    m_store = transpose( m_store_T );
+    m_load = transpose( m_load_T );
+  }
  
   // compute the store-store conflicts
   imats[I_ST_ST_MATRIX] = matrix_mult( m_store, m_store_T );
@@ -33,7 +41,7 @@ generate_index( BitIndexer* se_indexer )
   delete m_store_T;
   delete m_load_T;
   
-  // We restore and optimize the store/load matrices
+  // We save the store/load matrices
   imats[I_STORE_MATRIX] = m_store;
   imats[I_LOAD_MATRIX] = m_load;
   

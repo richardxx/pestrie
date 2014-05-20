@@ -14,7 +14,7 @@
 struct BitIndexer;
 
 typedef void (*BIT_OPTIMIZE)();
-typedef void (*BIT_GENERATE_INDEX)( struct BitIndexer* );
+typedef void (*BIT_GENERATE_INDEX)( struct BitIndexer*, bool );
 typedef void (*BIT_EXTERNALIZE_INDEX)( struct BitIndexer*, std::FILE*, bool );
 typedef void (*BIT_PROFILE_INDEX)( struct BitIndexer* );
 

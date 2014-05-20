@@ -24,6 +24,8 @@ static int input_format = INPUT_START_BY_SIZE;
 static int matrix_type = PT_MATRIX;
 static bool profile_in_detail = false;
 static bool binarization = false;
+static bool merging_eqls = true;
+
 
 // Program options
 static void
@@ -34,7 +36,8 @@ print_help(const char* prog_name)
   fprintf( stderr, "-e       : Specify the input matrix type\n" );
   fprintf( stderr, "       0 : Points-to matrix (default).\n" );
   fprintf( stderr, "       1 : Side-effect matrix.\n" );
-  fprintf( stderr, "-O       : Directly output the input matrix in binary format. Don't make index.\n" );
+  fprintf( stderr, "-j       : Do not merge the equivalent pointers/objects.\n" );
+  fprintf( stderr, "-B       : Directly output the input matrix in binary format. Don't make index.\n" );
   fprintf( stderr, "-F       : Specify the format of the input file\n" );
   fprintf( stderr, "       0 : Each line starts with the number of the following elements (default);\n" );
   fprintf( stderr, "       1 : Each line ends with -1.\n" );
@@ -47,7 +50,7 @@ parse_options( int argc, char **argv )
 {
   int c;
 
-  while ( (c = getopt( argc, argv, "e:F:gOh" ) ) != -1 ) {
+  while ( (c = getopt( argc, argv, "e:jF:gBh" ) ) != -1 ) {
     switch ( c ) {
     case 'e':
       matrix_type = atoi( optarg );
@@ -56,12 +59,16 @@ parse_options( int argc, char **argv )
     case 'F':
       input_format = atoi( optarg );
       break;
-      
+
+    case 'j':
+      merging_eqls = false;
+      break;
+
     case 'g':
       profile_in_detail = true;
       break;
       
-    case 'O':
+    case 'B':
       binarization = true;
       break;
 
@@ -135,8 +142,10 @@ int main( int argc, char **argv )
   if ( indexer == NULL ) return -1;
 
   if ( binarization == false ) {
-    // process
-    indexer->fp_generate_index( indexer );
+    // Generate persistence
+    indexer->fp_generate_index( indexer, merging_eqls );
+
+    // Profile the result
     if ( profile_in_detail )
       indexer->fp_profile_index( indexer );
   }

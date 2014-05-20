@@ -13,11 +13,18 @@
 using namespace std;
 
 static Cmatrix*
-compute_alias_matrix( Cmatrix* ptm )
+compute_alias_matrix( Cmatrix* ptm, bool merging_eqls )
 {
-  compress_equivalent_rows( ptm );
+  Cmatrix *ptm_T = NULL;
 
-  Cmatrix *ptm_T = compress_equivalent_columns( ptm );
+  if ( merging_eqls ) {
+    compress_equivalent_rows( ptm );
+    ptm_T = compress_equivalent_columns( ptm );
+  }
+  else {
+    ptm_T = transpose( ptm );
+  }
+
   Cmatrix *alm = matrix_mult( ptm, ptm_T );
   
   delete ptm_T;
@@ -26,12 +33,13 @@ compute_alias_matrix( Cmatrix* ptm )
 
 
 static void
-generate_index( BitIndexer* pt_indexer )
+generate_index( BitIndexer* pt_indexer, bool merging_eqls )
 {
   Cmatrix **imats = pt_indexer->imats;
 
   // Generate
-  imats[I_ALIAS_MATRIX] = compute_alias_matrix( imats[I_PT_MATRIX] );
+  imats[I_ALIAS_MATRIX] = 
+    compute_alias_matrix( imats[I_PT_MATRIX], merging_eqls );
   
   fprintf( stderr, "\n-----------Points-to Index-------------\n" );
   show_res_use( "Bitmap indexing" );
