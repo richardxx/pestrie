@@ -153,7 +153,7 @@ PesTrie::build_pestrie_core()
   // indicate if a pestrie node has been splitted
   memset( split, -1, sizeof(int) * (n+cm) );
 
-  // First m entries are reserved for the PesTrie subtree roots
+  // First cm entries are reserved for the PesTrie subtree roots
   // But not every root has a non-empty subtree
   int vertex_num = cm;
   for ( k = 0; k < cm; ++k ) {
@@ -527,7 +527,7 @@ PesTrie::profile_additional()
  * The index file is in binary form and the format is shown below:
  * 
  * Magic Number (4 bytes)
- * N_p(pointer) N_o(object) N_vn (vn) N_r(rectangles) N_v(verticals) N_h(horizontals) N_p(points)
+ * N_p(pointer) N_o(object) N_vn (ES) N_r(rectangles) N_v(verticals) N_h(horizontals) N_p(points)
  * preV labels (N_p+N_o)
  * R
  * V
@@ -566,7 +566,7 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   }
 
   for ( i = 0; i < m; ++i ) {
-    // i^th object is aggregated into the j'th group (pes node)
+    // i'th object is aggregated into the j'th group (pes node)
     j = ( m_rep == NULL ? i : m_rep[i] );
     // The sorted id of group j
     k = ( j == -1 ? -1 : obj_pos[j] );
@@ -629,7 +629,7 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
 
   for ( i = 0; i < n_horizs; ++i ) {
     Rectangle *p = figures->horizs->at(i);
-    // We store the values x1, y2, x2
+    // We store the values x1, y1, x2
     labels[0] = p->x1; labels[1] = p->y1; labels[2] = p->x2;
     fwrite( labels, sizeof(int), 3, fp );
     //printf( "%d %d %d %d\n", p->x1, p->x2, p->y1, p->y2 );
@@ -652,14 +652,16 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
       --j;
     }
 
+    // The shared X
     labels[0] = X;
+    // #points that share X
     labels[1] = i - j;
     fwrite( labels, sizeof(int), 2, fp );
 
     for ( ; i > j; --i ) {
       p = figures->points->at(i);
-      labels[0] = p->y1;
-      fwrite( labels, sizeof(int), 1, fp );
+      int Y = p->y1;
+      fwrite( &Y, sizeof(int), 1, fp );
       //printf( "%d %d %d %d\n", X, X, p->y1, p->y1 );
     }
   }

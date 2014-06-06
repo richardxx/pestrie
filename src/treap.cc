@@ -31,6 +31,9 @@ rotate_right( struct TreapNode *p )
   return t;
 }
 
+/*
+ * In order traversal, keeping the results sorted.
+ */
 static void dfs_visit_tree( TreapNode *p, TREAP_VISITOR fp_visitor, void* par )
 {
    if ( p == NULL ) return;

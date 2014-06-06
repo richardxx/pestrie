@@ -84,7 +84,7 @@ public:
   int *r_count;              // #non zero columns for each row of pt-matrix
 
   // PesTrie and its descriptions
-  int vn;                  // #vertex
+  int vn;                  // #vertex (ES)
   std::vector<int> *tree_edges;
   std::vector<CrossEdgeRep*> *cross_edges;
   int *bl, *pes;           // The ES label and PES label of the pointers and ESes

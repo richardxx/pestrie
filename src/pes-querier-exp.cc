@@ -235,6 +235,48 @@ build_query_header( int x, QHeader *p )
   bitmap_set_bit( pointsto, tree[x] );
 }
 
+// Concatenate continuous segments into large segments
+// Be careful some segments are shared
+/*
+static void
+merge_segments( VECTOR(VLine*) &rects )
+{
+  int size = rects.size();
+  VLine* p_last = rects[0];
+  int i_last = 0;
+  int k = 1;
+
+  for ( int i = 1; i < size; ++i ) {
+    VLine* pl = rects[i];
+    
+    if ( pl->y1 > p_last->y2 + 1 ) {
+      // They are not continuous
+      rects[k] = pl;
+      p_last = pl;
+      i_last = k++;
+    }
+    else {
+      // merge
+      if ( p_last->counts > 1 ) {
+	// We copy on write
+	VLine* p_new = new VLine(p_last);
+	p_last->counts--;
+	rects[i_last] = p_new;
+	p_last = p_new;
+      }
+      p_last->y2 = pl->y2;
+      
+      // Update
+      pl->counts--;
+      if ( pl->counts == 0 ) delete pl;
+    }
+  }
+  
+  //if ( k < size ) printf( "%d\n", size - k );
+  rects.reset_end(k);
+}
+*/
+
 static bool 
 read_index()
 {

@@ -2,7 +2,6 @@
    
    src/:           the source code of our algorithms
    pestrie_exp/:   the data used in our experiments
-   soot-dump.jar, paddle-dump.jar:  the soot jar packages for producing geometric encoding based and 1H-objsens based points-to information
 
 
 
@@ -56,7 +55,7 @@
 
    The data shown in table 8 can be found in "build_log.txt" for in every subject's own folder. To check the index size of a subject (e.g. "antlr06"), just type in the command line:
 
-   > grep "index size is" build_log.txt
+   >grep "index size is" build_log.txt
 
    There will show two lines similar to following examples:
 
@@ -65,7 +64,7 @@
 
    To checkout the construction time, type:
 
-   > grep "indexing time" build_log.txt
+   >grep "indexing time" build_log.txt
 
    This also checks out two lines:
 

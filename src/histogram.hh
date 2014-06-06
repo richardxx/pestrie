@@ -1,5 +1,5 @@
 /*
- * A histogram visualizer, an ehanced version from my Java implementation.
+ * A histogram visualizer, an enhanced version from my Java implementation.
  * By richardxx, 2011.9
  */
 
@@ -16,13 +16,18 @@ using std::vector;
 class histogram
 {
 public:
-  vector<long> limits;    // The scale all the sections
-  vector<long> results;   // results[i] stores the values in the interval: (limits[i-1], limits[i]), limits[-1] = -inf, limits[n] = inf
-  vector<double> weights;   // The accumulated weights for each interval
+  // The scale all the sections
+  vector<long> limits;
+  // results[i] stores the values in the half-open interval: (limits[i-1], limits[i]], limits[-1] = -inf, limits[n] = inf
+  vector<long> results;  
+  // The accumulated weights for each interval
+  vector<double> weights;
+  // The maximum sample value recorded
   double maxValue;
-  
-  int count;             // #of samples
-  double tot_wts;        // total weights of all samples
+  // #of samples
+  int count;   
+  // total weights of all samples
+  double tot_wts;  
   
 public:
   histogram()
@@ -165,9 +170,9 @@ public:
 	num = results[i];
       
       if ( i == 0 )
-	fprintf( out, "-inf < samples <= %d: %d", limits[0], num );
+	fprintf( out, "-inf < x <= %d: %d", limits[0], num );
       else
-	fprintf( out, "%d < samples <= %d: %d", limits[i-1], limits[i], num );
+	fprintf( out, "%d < x <= %d: %d", limits[i-1], limits[i], num );
       
       fprintf( out, ", percentage = %.3lf\%\n", (double)num / count * 100 ); 
     }
@@ -180,9 +185,9 @@ public:
     }
 
     if ( firstN == 0 )
-      fprintf( out, "samples > -inf: %d", num );
+      fprintf( out, "x > -inf: %d", num );
     else
-      fprintf( out, "samples > %d: %d", limits[firstN-1], num );
+      fprintf( out, "x > %d: %d", limits[firstN-1], num );
 
     fprintf( out, ", percentage = %.3lf\%\n", (double)num / count * 100 );     
     fprintf( out, "\n" );
@@ -214,9 +219,9 @@ public:
 	num = weights[i];
       
       if ( i == 0 )
-	fprintf( out, "-inf < samples <= %d: %.2lf", limits[0], num );
+	fprintf( out, "-inf < x <= %d: %.2lf", limits[0], num );
       else
-	fprintf( out, "%d < samples <= %d: %.2lf", limits[i-1], limits[i], num );
+	fprintf( out, "%d < x <= %d: %.2lf", limits[i-1], limits[i], num );
       
       fprintf( out, ", percentage = %.3lf\%\n", num / tot_wts * 100 ); 
     }
@@ -229,9 +234,9 @@ public:
     }
 
     if ( firstN == 0 )
-      fprintf( out, "samples > -inf: %.2lf", num );
+      fprintf( out, "x > -inf: %.2lf", num );
     else
-      fprintf( out, "samples > %d: %.2lf", limits[firstN-1], num );
+      fprintf( out, "x > %d: %.2lf", limits[firstN-1], num );
 
     fprintf( out, ", percentage = %.3lf\%\n", num / tot_wts * 100 );     
     fprintf( out, "\n" );

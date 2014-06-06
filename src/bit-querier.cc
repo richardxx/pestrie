@@ -282,7 +282,7 @@ IsAlias( BitQS* bitqs, int x, int y )
   return ret != 0;
 }
 
-int
+static int
 iterate_equivalent_set( kvec_t(int) *es_set )
 {
   int ans = 0;
@@ -290,7 +290,8 @@ iterate_equivalent_set( kvec_t(int) *es_set )
 
   for ( int i = 0; i < size; ++i ) {
     int q = es_set->at(i);
-    ++ans;
+    if ( q > 0 )
+      ans++;
   }
 
   return ans;
@@ -661,36 +662,53 @@ traverse_result( BitQS *bitqs )
   int m = bitqs->m;
   int n_query = ( query_type == LIST_POINTED_TO ? m : n );
 
-  for ( int i = 0; i < n_query; ++i ) {   
+  // We permute the pointers/objects
+  /*
+  int *queries = new int[n_query];
+  for ( int i = 0; i < n_query; ++i ) queries[i] = i;
+
+  for ( int i = 0; i < n_query - 1; ++i ) {
+    int j = queries[i];
+    int k = rand() % ( n_query - i ) + i;
+    queries[i] = queries[k];
+    queries[k] = j;
+  }
+  */
+
+  for ( int i = 0; i < n_query; ++i ) {
+    //x = queries[i];
+    x = i;
+
     switch ( query_type ) {
     case IS_ALIAS:
-      x = rand() % n; y = rand() % n;
-      ans += IsAlias( bitqs, x, y );
+      y = n_query - x;
+      ans += (IsAlias( bitqs, x, y ) == true ? 1 : 0);
       break;
       
     case LIST_POINTS_TO:
-      ans += ListPointsTo( bitqs, i );
+      ans += ListPointsTo( bitqs, x );
       break;
       
     case LIST_POINTED_TO:
-      ans += ListPointedTo( bitqs, i );
+      ans += ListPointedTo( bitqs, x );
       break;
       
     case LIST_ALIASES:
-      ans += ListAliases_by_representatives( bitqs, i, NULL );
+      ans += ListAliases_by_representatives( bitqs, x, NULL );
       break;
   
     case LIST_ACC_VARS:
-      ans += ans += ListModRefVars(bitqs, i);
+      ans += ans += ListModRefVars(bitqs, x);
       break;
       
     case LIST_CONFLICTS:
-      ans += ListConflicts(bitqs, i);
+      ans += ListConflicts(bitqs, x);
       break;
     }
   }
   
-  //fprintf( stderr, "Total Conflicts = %d\n", ans );
+  fprintf( stderr, "\nReference answer = %d\n", ans );
+  //delete[] queries;
 }
 
 // We rebuild the index currently

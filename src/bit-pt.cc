@@ -12,9 +12,10 @@
 
 using namespace std;
 
-static Cmatrix*
-compute_alias_matrix( Cmatrix* ptm, bool merging_eqls )
+static void
+compute_alias_matrix( Cmatrix** imats, bool merging_eqls )
 {
+  Cmatrix *ptm = imats[I_PT_MATRIX];
   Cmatrix *ptm_T = NULL;
 
   if ( merging_eqls ) {
@@ -25,10 +26,8 @@ compute_alias_matrix( Cmatrix* ptm, bool merging_eqls )
     ptm_T = transpose( ptm );
   }
 
-  Cmatrix *alm = matrix_mult( ptm, ptm_T );
-  
-  delete ptm_T;
-  return alm;
+  imats[I_ALIAS_MATRIX] = matrix_mult( ptm, ptm_T );
+  imats[I_PTED_MATRIX] = ptm_T;
 }
 
 
@@ -38,8 +37,7 @@ generate_index( BitIndexer* pt_indexer, bool merging_eqls )
   Cmatrix **imats = pt_indexer->imats;
 
   // Generate
-  imats[I_ALIAS_MATRIX] = 
-    compute_alias_matrix( imats[I_PT_MATRIX], merging_eqls );
+  compute_alias_matrix( imats, merging_eqls );
   
   fprintf( stderr, "\n-----------Points-to Index-------------\n" );
   show_res_use( "Bitmap indexing" );
@@ -105,11 +103,22 @@ advanced_profile( BitIndexer* pt_indexer )
     int sz = bitmap_count_bits( am->mat[i] );
     alias_skew.add_sample( sz );
   }
-  
 
+  // Pointed-to matrix
+  histogram pted_skew;
+  long pted_scales[] = { 3, 20, 80, 200 };
+  pted_skew.push_scales( pted_scales, 4 );
+  
+  Cmatrix *pted = imats[I_PTED_MATRIX];
+  for ( int i = 0; i < pted->n_r_reps; ++i ) {
+    int sz = bitmap_count_bits( pted->mat[i] );
+    pted_skew.add_sample( sz );
+  }
+  
   // Output
-  alias_skew.print_result( stderr, "Alias size distribution", false );
-  pt_skew.print_result( stderr, "Points-to size distribution", false );
+  pt_skew.print_result( stderr, "Points-to matrix size distribution", false );
+  alias_skew.print_result( stderr, "Alias matrix size distribution", false );
+  pted_skew.print_result( stderr, "Pointed-to matrix size distribution", false );
 }
 
 
@@ -193,9 +202,11 @@ parse_points_to_input( FILE *fp, int fmt )
   
   // 0 is points-to matrix
   // 1 is reserved for alias matrix
-  Cmatrix **pt_set = new Cmatrix*[2];
+  // 2 is reserved for pointed-to matrix
+  Cmatrix **pt_set = new Cmatrix*[N_OF_PT_INDEX];
   pt_set[I_PT_MATRIX] = ptm;
   pt_set[I_ALIAS_MATRIX] = NULL;
+  pt_set[I_PTED_MATRIX] = NULL;
 
   BitIndexer *pt_indexer = new BitIndexer;
   pt_indexer->imats = pt_set;
