@@ -24,13 +24,15 @@ struct TreapNode
     rkey = std::rand();
     left = right = NULL;
   }
-  
+
+  /*
   ~TreapNode()
   {
     if ( data != NULL ) delete data;
     if ( left != NULL ) delete left;
     if ( right != NULL ) delete right;
   }
+  */
 };
 
 typedef void (*TREAP_VISITOR)( TreapNode*, void* );

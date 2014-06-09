@@ -29,8 +29,8 @@ struct SegTreeNode
   // Delete everything recursively
   ~SegTreeNode()
   {
-    if ( rects != NULL ) delete rects;
-    if ( points != NULL ) delete points;
+    clean_treap(rects);
+    clean_treap(points);
   }
 };
 
