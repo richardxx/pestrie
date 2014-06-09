@@ -133,7 +133,7 @@ static QHeader*
 build_seg_tree( int l, int r )
 {
   int x = (l+r) / 2;
-  QHeader* p = unitRoots[x];
+  QHeader* p = new QHeader; 
   
   p->x1 = l;
   p->x2 = r;
@@ -144,12 +144,13 @@ build_seg_tree( int l, int r )
       p->left->parent = p;
     }
     
-    if ( x <= r ) {
-      p->right = build_seg_tree( x, r ); 
+    if ( x < r ) {
+      p->right = build_seg_tree( x + 1, r ); 
       p->right->parent = p;
     }
   }
 
+  unitRoots[x] = p;
   return p;
 }
 
@@ -175,10 +176,10 @@ static void
 insert_point( int x, int y )
 {
   VLine* p = new VLine(y, y);
-  unitRoots[x]->add_point(p);
+  unitRoots[x]->add_vertis(p);
   
   p = new VLine(x, x);
-  unitRoots[y]->add_point(p);
+  unitRoots[y]->add_vertis(p);
 }
 
 /*
@@ -222,10 +223,11 @@ process_figures( FILE* fp )
     fread( &buf_size, sizeof(int), 1, fp );
     if ( buf_size == 0 ) continue;
     fread( labels, sizeof(int), buf_size, fp );
+    fprintf( stderr, "%d\n", buf_size );
 
     int i = 0;
     while ( i < buf_size ) {
-      int y1 = labels[i];
+      int y1 = labels[i++];
       int x2, y2;
 
       if ( (y1 & SIG_POINT) == SIG_POINT ) {
@@ -252,11 +254,21 @@ process_figures( FILE* fp )
 
       // First, the reversed rect
       VLine* p = new VLine(x1, x2);
-      insert_rect( y1, y2, p, segRoot );
-      
+      if ( y1 == y2 ) {
+	unitRoots[y1]->add_vertis(p);
+      }
+      else {
+	insert_rect( y1, y2, p, segRoot );
+      }
+
       // Second, cache it
       Rectangle* r = new Rectangle(x1, x2, y1, y2);
-      all_rects.push_back(r);
+      if ( x1 == x2 ) {
+	unitRoots[x1]->add_vertis(r);
+      }
+      else {
+	all_rects.push_back(r);
+      }
     }
   }
 
@@ -300,7 +312,7 @@ read_index()
   // Loading and decoding the persistence file
   prepare_pestrie_info(fp);
   process_figures(fp);
-  
+
   fprintf( stderr, "\n-------Input: %s-------\n", input_file );
   show_res_use( "Index loading" );
 

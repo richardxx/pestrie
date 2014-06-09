@@ -107,11 +107,13 @@ public:
     //pointsto = BITMAP_ALLOC(NULL);
   }
 
-  void add_rect( VLine* p ) { 
+  void add_rect( VLine* p ) 
+  { 
     rects.push_back(p);
   }
-
-  void add_point( VLine* p ) { 
+  
+  void add_vertis( VLine* p ) 
+  { 
     vertis.push_back(p); 
     //bitmap_set_bit(pointsto, p);
   }

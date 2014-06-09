@@ -206,7 +206,7 @@ dump_figures( SegTree *seg_tree, FILE* fp )
 	offset += r->prepare_labels( labels + offset );
       }
 
-      labels[0] = offset;
+      labels[0] = offset - 1;
       total_labels += offset;
     }
 
