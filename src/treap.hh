@@ -1,3 +1,4 @@
+
 /*
  * A high performance probablistic balanced tree.
  * The implementation is tailored for the PesTrie algorithm.
@@ -35,8 +36,26 @@ struct TreapNode
 typedef void (*TREAP_VISITOR)( TreapNode*, void* );
 
 //
-extern Point* find_treap( TreapNode*, int);
-extern TreapNode* insert_treap( TreapNode*, Point*);
-extern void visit_treap( TreapNode *, TREAP_VISITOR, void* );
+Point* find_treap( TreapNode*, int);
+TreapNode* insert_treap( TreapNode*, Point*);
+TreapNode* remove_treap( TreapNode*, int);
+void clean_treap( TreapNode* );
+
+
+// Inorder traversal, for the reason of speeding up the index load
+template<class T> void 
+visit_treap( TreapNode *p, vector<T>* set )
+{
+  if ( p == NULL ) return;
+  
+  if ( p->left != NULL )
+    visit_treap<T>( p->left, set );
+  
+  set->push_back((T)p->data);
+  
+  if ( p->right != NULL )
+    visit_treap<T>( p->right, set );
+}
+
 
 #endif

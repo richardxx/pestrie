@@ -25,6 +25,7 @@
 #endif
 
 #include "obstack.h"
+#include <stdlib.h>
 
 /* NOTE BEFORE MODIFYING THIS FILE: This version number must be
    incremented whenever callers compiled using an old obstack.h can no

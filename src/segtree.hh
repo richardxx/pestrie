@@ -8,6 +8,9 @@
 #define SEGTREE_H
 
 #include "treap.hh"
+#include <cstdio>
+using std::FILE;
+
 
 struct SegTreeNode
 {
@@ -43,12 +46,20 @@ struct SegTree
   ~SegTree();
 };
 
-// To help implement a general visitor
-typedef void (*SEG_TREE_VISITOR)( SegTreeNode*, void* );
 
-extern SegTree* build_segtree( int, int);
-extern bool query_point( SegTree*, int, int );
-extern void insert_segtree_wrapper( SegTree*, const Rectangle& );
-extern void visit_segTree( SegTree*, SEG_TREE_VISITOR, void* );
+SegTree* 
+build_segtree( int, int);
+
+bool
+query_point( SegTree*, int, int );
+
+void
+insert_segtree_wrapper( SegTree*, const Rectangle& );
+
+int
+dump_figures( SegTree*, FILE* fp );
+
+void
+flush_left_shapes( SegTree* );
 
 #endif

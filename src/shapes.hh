@@ -6,10 +6,18 @@
 #ifndef SHAPE_H
 #define SHAPE_H
 
+#include <vector>
+using std::vector;
+
+const int SIG_POINT = 0;
+const int SIG_VERTICAL = 0x04000000;
+const int SIG_HORIZONTAL = 0x80000000;
+const int SIG_RECT = 0xc0000000;
+
 struct Point
 {
   int x1, y1;
-  //bool selected;
+  bool used;
 
   Point() { }
   Point( const Point& pt ): x1(pt.x1), y1(pt.y1) { }
@@ -24,6 +32,12 @@ struct Point
 
   Point* clone() {
     return new Point(*this);
+  }
+
+  virtual int prepare_labels(int* labels)
+  {
+    labels[0] = y1;
+    return 1;
   }
 };
 
@@ -115,12 +129,51 @@ struct Rectangle : public VLine
     return new Rectangle(*this);
   }
 
-  Point* minimize_clone() {
-    if (x1 == x2) {
-      if ( y1 == y2 )
-	return new Point(x1, y1);
-      // FIXME!
+  // Virtual overloading
+  int prepare_labels(int* labels)
+  {
+    if ( y1 == y2 ) {
+      // A vertical
+      labels[0] = y1 | SIG_VERTICAL;
+      labels[1] = y2;
+      return 2;
     }
+    else if ( x1 == x2 ) {
+      // A horizontal
+      labels[0] = x2 | SIG_HORIZONTAL;
+      labels[1] = y1;
+      return 2;
+    }
+
+    labels[0] = x2 | SIG_RECT;
+    labels[1] = y1;
+    labels[2] = y2;
+    return 3;
+  }
+};
+
+// An structure used to collect the figures
+struct FigureSet
+{
+  vector<Point*> *points;
+  vector<Rectangle*> *rects;
+
+  FigureSet()
+  {
+    points = new vector<Point*>;
+    rects = new vector<Rectangle*>;
+  }
+  
+  ~FigureSet()
+  {
+    delete points;
+    delete rects;
+  }
+
+  void clear() 
+  {
+    points->clear();
+    rects->clear();
   }
 };
 

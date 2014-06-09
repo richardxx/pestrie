@@ -60,6 +60,16 @@ insert_rectangle( SegTree *p_seg, Point* r, bool is_point )
   }
 }
 
+static 
+void collect_figures_visitor( SegTreeNode* pseg, FigureSet* fs )
+{
+  // We directly call the treap traversal procedure
+  if ( pseg->rects != NULL )
+    visit_treap<Rectangle*>( pseg->rects, fs->rects );
+
+  if ( pseg->points != NULL )
+    visit_treap<Point*>( pseg->points, fs->points );
+}
 //==================================================================
 
 SegTree::SegTree( int mx )
@@ -91,17 +101,6 @@ build_segtree( int s, int e )
   //test_file = fopen( "rects.txt", "w" );
  
   return seg_tree;
-}
-
-// A universal traversal procedure for customized tree visit
-void visit_segTree( SegTree *seg_tree, SEG_TREE_VISITOR fp_visitor, void* par )
-{
-  SegTreeNode **unitRoots = seg_tree->unitRoots;
-  int maxN = seg_tree->maxN;
-  
-  for ( int i = 0; i < maxN; ++i )
-    if ( unitRoots[i] != NULL )
-      fp_visitor( unitRoots[i], par );
 }
 
 /*
@@ -155,18 +154,107 @@ insert_segtree_wrapper( SegTree* seg_tree, const Rectangle& r )
   if ( r.x1 == r.x2 && r.y1 == r.y2 ) {
     Point *pt = new Point( r );
     insert_rectangle( seg_tree, pt, true );
-    //(seg_tree->n_points)++;
+    
+    (seg_tree->n_points)++;
   }
   else {
     Rectangle *rr = new Rectangle( r );
     insert_rectangle( seg_tree, rr, false );
-    /*
+    
     if (r.x1 == r.x2) (seg_tree->n_vertis)++;
     else if (r.y1 == r.y2) (seg_tree->n_horizs)++;
     else (seg_tree->n_rects)++;
-    */
+    
   }
 
   seg_tree->n_pairs += (r.x2-r.x1+1) * (r.y2-r.y1+1);
   //fprintf( test_file, "(%d, %d, %d, %d)\n", r.x1, r.x2, r.y1, r.y2 );
+}
+
+// A universal traversal procedure for customized tree visit
+int
+dump_figures( SegTree *seg_tree, FILE* fp )
+{
+  SegTreeNode **unitRoots = seg_tree->unitRoots;
+  int maxN = seg_tree->maxN;
+  FigureSet* fs = new FigureSet;
+  int *labels = new int[maxN*3];
+  int total_labels = 0;
+
+  // Visit the figures
+  for ( int i = 0; i < maxN; ++i )
+    if ( unitRoots[i] != NULL ) {
+      fs->clear();
+      collect_figures_visitor( unitRoots[i], fs );
+      
+      // Write out
+      labels[0] = i;
+      int offset = 1;
+
+      vector<Point*> *points = fs->points;
+      int size = points->size();
+      for ( int j = 0; j < size; ++j ) {
+	Point* p = points->at(j);
+	offset += p->prepare_labels( labels + offset );
+      }
+
+      vector<Rectangle*> *rects = fs->rects;
+      size = rects->size();
+      for ( int j = 0; j < size; ++j ) {
+	Rectangle* r = rects->at(j);
+	offset += r->prepare_labels( labels + offset );
+      }
+
+      fwrite( labels, sizeof(int), offset, fp );
+      total_labels += offset;
+    }
+
+  delete fs;
+  delete[] labels;
+
+  return total_labels;
+}
+
+/*
+ * Reinsert all the figures to the treap aligned by left point.
+ */
+void
+flush_left_shapes( SegTree *seg_tree )
+{
+  // Collect the rectangles and reinsert
+  int maxN = seg_tree->maxN;
+  SegTreeNode **unitRoots = seg_tree->unitRoots;
+  FigureSet* fs = new FigureSet;
+
+  for ( int i = 0; i < maxN; ++i ) {
+    SegTreeNode *segNode = unitRoots[i];
+    if ( segNode == NULL ||
+	 segNode->rects == NULL )
+      continue;
+
+    // Collect
+    vector<Rectangle*> *rects_set = fs->rects;
+    rects_set->clear();
+    visit_treap<Rectangle*>( segNode->rects, rects_set );
+    
+    // Redistribute the figures again
+    for ( int j = rects_set->size() - 1; j > -1; --j ) {
+      Rectangle* r = rects_set->at(j);
+
+      if ( r->x1 != i ) {
+	// We first remove this figure
+	segNode->rects = remove_treap( segNode->rects, r->y1 );
+	
+	// Insert again
+	if (unitRoots[r->x1] == NULL ) {
+	  unitRoots[r->x1] = new SegTreeNode;
+	}
+	
+	SegTreeNode* p = unitRoots[r->x1];
+	p->rects = insert_treap( p->rects, r );
+      }
+    }
+  }
+
+  delete fs;
 }

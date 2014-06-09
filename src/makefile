@@ -2,7 +2,7 @@ CFLAGS = -w -Wall -O3
 BASIC_DEPS_H = bitmap.h profile_helper.h options.h 
 BASIC_DEPS_C = obstack.o bitmap.o profile_helper.o
 PESTRIE_DEPS_H = pestrie.hh segtree.hh treap.hh kvec.hh histogram.hh matrix-ops.hh
-PESTRIE_DEPS_C = segtree.o treap.o pes-common.o pes-self.o pes-dual.o matrix-ops.o
+PESTRIE_DEPS_C = segtree.o treap.o pes-common-exp.o pes-self.o pes-dual.o matrix-ops.o
 BITINDEX_DEPS_H = matrix-ops.hh bit-index.hh
 BITINDEX_DEPS_C = matrix-ops.o bit-pt.o bit-se.o
 LIB = #-L/usr/local/lib -ltcmalloc
@@ -31,8 +31,8 @@ treap.o : treap.hh treap.cc
 segtree.o : segtree.hh segtree.cc
 	$(CC) segtree.cc $(CFLAGS) $(LIB) -c
 
-pes-common.o : pestrie.hh pes-common.cc
-	$(CC) pes-common.cc $(CFLAGS) $(LIB) -c
+pes-common-exp.o : pestrie.hh pes-common-exp.cc
+	$(CC) pes-common-exp.cc $(CFLAGS) $(LIB) -c
 
 pes-self.o : segtree.hh pes-self.cc
 	$(CC) pes-self.cc $(CFLAGS) $(LIB) -c

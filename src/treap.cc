@@ -31,20 +31,35 @@ rotate_right( struct TreapNode *p )
   return t;
 }
 
-/*
- * In order traversal, keeping the results sorted.
- */
-static void dfs_visit_tree( TreapNode *p, TREAP_VISITOR fp_visitor, void* par )
+static TreapNode*
+remove_node( TreapNode* p )
 {
-   if ( p == NULL ) return;
+  // case 1
+  if ( p->left == NULL ) {
+    delete p;
+    return p->right;
+  }
   
-  if ( p->left != NULL )
-    dfs_visit_tree( p->left, fp_visitor, par );
+  // case 2
+  if ( p->right == NULL ) {
+    delete p;
+    return p->left;
+  }
   
-  fp_visitor( p, par );
-  
-  if ( p->right != NULL )
-    dfs_visit_tree( p->right, fp_visitor, par );
+  // case 3
+  if ( p->left->rkey <= p->right->rkey ) {
+    // We turn left
+    p->rkey = p->left->rkey;
+    p->data = p->left->data;
+    p->left = remove_node( p->left ); 
+  }
+  else {
+    p->rkey = p->right->rkey;
+    p->data = p->right->data;
+    p->right = remove_node( p->right );
+  }
+
+  return p;
 }
 
 // -------------------------------------------------------
@@ -92,10 +107,39 @@ insert_treap( struct TreapNode* p, Point *r )
   
   return p;
 }
- 
-// Inorder traversal, for the reason of speeding up the index load
-void visit_treap( struct TreapNode *p, TREAP_VISITOR fp_visitor, void* par )
+
+// Remove the specified treap node
+struct TreapNode*
+remove_treap( struct TreapNode* p, int y )
 {
-  dfs_visit_tree( p, fp_visitor, par );
+  if ( p == NULL ) return NULL;
+
+  int y1 = p->data->y1;
+  
+  if ( y1 == y ) {
+    p = remove_node(p);
+  }
+  else if ( y1 > y ) {
+    p->left = remove_treap( p->left, y );
+  }
+  else {
+    p->right = remove_treap( p->right, y );
+  }
+  
+  return p;
+}
+
+void
+clean_treap( struct TreapNode* p )
+{
+  if ( p == NULL ) return;
+
+  if ( p->left != NULL )
+    clean_treap( p->left );
+
+  if ( p->right != NULL )
+    clean_treap( p->right );
+  
+  delete p;
 }
 
