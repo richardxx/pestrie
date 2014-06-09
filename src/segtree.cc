@@ -182,32 +182,36 @@ dump_figures( SegTree *seg_tree, FILE* fp )
   int total_labels = 0;
 
   // Visit the figures
-  for ( int i = 0; i < maxN; ++i )
+  for ( int i = 0; i < maxN; ++i ) {
+    // Reset
+    labels[0] = 0;
+    int offset = 1;
+
     if ( unitRoots[i] != NULL ) {
       fs->clear();
       collect_figures_visitor( unitRoots[i], fs );
-      
-      // Write out
-      labels[0] = i;
-      int offset = 1;
-
       vector<Point*> *points = fs->points;
+      vector<Rectangle*> *rects = fs->rects;
+
+      // Write out
       int size = points->size();
       for ( int j = 0; j < size; ++j ) {
 	Point* p = points->at(j);
 	offset += p->prepare_labels( labels + offset );
       }
 
-      vector<Rectangle*> *rects = fs->rects;
       size = rects->size();
       for ( int j = 0; j < size; ++j ) {
 	Rectangle* r = rects->at(j);
 	offset += r->prepare_labels( labels + offset );
       }
 
-      fwrite( labels, sizeof(int), offset, fp );
+      labels[0] = offset;
       total_labels += offset;
     }
+
+    fwrite( labels, sizeof(int), offset, fp );
+  }
 
   delete fs;
   delete[] labels;

@@ -80,14 +80,39 @@ public:
   
   fast_vec_t()
   {
-    n = 0;
+    n = m = 0;
     a = NULL;
     resize( INITIAL_SIZE );
   }
 
+  fast_vec_t(int sz)
+  {
+    n = m = 0;
+    a = NULL;
+    resize( sz );
+  }
+
+  fast_vec_t( fast_vec_t<T> &other )
+  {
+    n = m = 0;
+    a = NULL;
+    copy( other );
+  }
+  
   ~fast_vec_t()
   {
     delete[] a;
+  }
+
+  void copy( fast_vec_t<T> &other ) 
+  {
+    int sz = other.size();
+    if ( m < sz ) resize(sz);
+    
+    for ( int i = 0; i < sz; ++i ) {
+      T t = other[i];
+      a[i] = t;
+    }
   }
   
   void resize( int size )
@@ -129,7 +154,9 @@ public:
     }
     
     a[n++] = x;
-  }  
+  }
+  
+  void clear() { n = 0; }
 };
   
 #else

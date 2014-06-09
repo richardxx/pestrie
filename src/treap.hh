@@ -17,14 +17,14 @@ struct TreapNode
   int rkey;                         // A random key used to maintain the heap property
   Point* data;                      // Only accept the pointer data
   struct TreapNode *left, *right;
-
+  
   TreapNode( Point *r )
   {
     data = r;
     rkey = std::rand();
     left = right = NULL;
   }
-
+  
   /*
   ~TreapNode()
   {

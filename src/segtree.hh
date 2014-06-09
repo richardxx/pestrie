@@ -17,13 +17,11 @@ struct SegTreeNode
   // The size of segment tree would be larger if we split the rectangles and points
   struct TreapNode *rects;
   struct TreapNode *points;
-  //bool left, right;
 
   SegTreeNode()
   {
     rects = NULL;
     points = NULL;
-    //left = right = false;
   }
   
   // Delete everything recursively

@@ -140,13 +140,13 @@ struct Rectangle : public VLine
     }
     else if ( x1 == x2 ) {
       // A horizontal
-      labels[0] = x2 | SIG_HORIZONTAL;
-      labels[1] = y1;
+      labels[0] = y1 | SIG_HORIZONTAL;
+      labels[1] = x2;
       return 2;
     }
 
-    labels[0] = x2 | SIG_RECT;
-    labels[1] = y1;
+    labels[0] = y1 | SIG_RECT;
+    labels[1] = x2;
     labels[2] = y2;
     return 3;
   }
