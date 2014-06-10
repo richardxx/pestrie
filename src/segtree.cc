@@ -241,7 +241,8 @@ flush_left_shapes( SegTree *seg_tree )
     visit_treap<Rectangle*>( segNode->rects, rects_set );
     
     // Redistribute the figures again
-    for ( int j = rects_set->size() - 1; j > -1; --j ) {
+    int size = rects_set->size();
+    for ( int j = 0; j < size; ++j ) {
       Rectangle* r = rects_set->at(j);
 
       if ( r->x1 != i ) {

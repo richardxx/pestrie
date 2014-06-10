@@ -155,6 +155,15 @@ public:
     
     a[n++] = x;
   }
+
+  void add_all( fast_vec_t<T> &other ) 
+  {
+    int sz = other.size();
+    for ( int i = 0; i < sz; ++i ) {
+      T e = other[i];
+      push_back(e);
+    }
+  }
   
   void clear() { n = 0; }
 };

@@ -164,9 +164,13 @@ optimize_seg_tree( QHeader* p )
   
   if ( q != NULL &&
        q->n_of_rects() == 0 ) {
-    p->parent = q->parent;
+    q = q->parent;
+    p->parent = q;
   }
   
+  if ( q == NULL )
+    p->merged = true;
+
   if ( p->left != NULL )
     optimize_seg_tree( p->left );
   if ( p->right != NULL )
@@ -210,13 +214,12 @@ process_figures( FILE* fp )
 {
   // First we initialize the segment tree
   unitRoots = new QHeader*[vertex_num];
-  build_seg_tree( 0, vertex_num );
-  segRoot = unitRoots[vertex_num/2];
-  segRoot->merged = true;
+  segRoot = build_seg_tree( 0, vertex_num );
 
+  // We insert the figures into the tree
   int buf_size;
   int *labels = new int[vertex_num * 3];
-  VECTOR(Rectangle*) all_rects; 
+  VECTOR(Rectangle*) all_rects(vertex_num);
 
   for ( int x1 = 0; x1 < vertex_num; ++x1 ) {
     fread( &buf_size, sizeof(int), 1, fp );
@@ -365,10 +368,9 @@ iterate_equivalent_set( VECTOR(int) *es_set )
 static void
 recursive_merge( QHeader* p )
 {
-  if ( p->merged == true ) return;
-    
-  if ( p->parent->merged == false )
-    recursive_merge( p->parent);
+  if ( p->merged == true ) return;  
+  if ( p->parent == NULL ) return;
+  recursive_merge( p->parent );
 
   VECTOR(VLine*) &list1 = p->parent->rects;
   int sz1 = list1.size();
@@ -376,19 +378,20 @@ recursive_merge( QHeader* p )
 
   if ( sz1 != 0 ) {
     // We have something to merge top down
+    VECTOR(VLine*) &list3 = p->rects;
     if ( sz2 == 0 ) {
       // Fast path, just copy
-      p->rects.copy( list1 );
+      list3.add_all( list1 );
     }
     else {
-      VECTOR(VLine*) &list3 = p->rects;
-      VECTOR(VLine*) list2(list3);
-      
-      int i = 0, j = 0;
-      VLine *r1 = list1[0], *r2 = list2[0];
+      VECTOR(VLine*) list2;
+      list2.add_all( list3 );
       list3.clear();
 
-      while ( r1 != NULL && r2 != NULL ) {
+      int i = 0, j = 0;
+      VLine *r1 = list1[0], *r2 = list2[0];
+      
+      while ( r1 != NULL || r2 != NULL ) {
 	if ( r2 == NULL || 
 	     ( r1 != NULL && r1->y1 < r2->y1 ) ) {
 	  list3.push_back(r1);
@@ -417,7 +420,7 @@ binary_search( VECTOR(VLine*) &rects, int y )
 
   s = 0; 
   e = rects.size();
-
+  /*
   if ( e < 3 ) {
     // fast path
     while ( s < e ) {
@@ -428,6 +431,7 @@ binary_search( VECTOR(VLine*) &rects, int y )
     }
   }
   else {
+  */
     while ( e > s ) {
       mid = (s+e) / 2;
       tt = rects[mid];
@@ -442,7 +446,7 @@ binary_search( VECTOR(VLine*) &rects, int y )
       else
 	s = mid + 1;
     }
-  }
+    //  }
 
   return false;
 }
@@ -470,13 +474,21 @@ IsAlias( int x, int y )
   if ( binary_search( p->vertis, y ) ) 
     return true;
 
+  /*
   // We traverse the segment tree bottom up
   while ( p != NULL ) {    
     if ( binary_search( p->rects, y ) ) 
       return true;
     p = p->parent;
   }
-  
+  */
+
+  if ( p->merged == false )
+    recursive_merge(p);
+
+  if ( binary_search( p->rects, y ) )
+    return true;
+
   return false;
 }
 
