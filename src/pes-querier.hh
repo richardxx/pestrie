@@ -17,39 +17,12 @@ const int SIG_HORIZONTAL = 0x80000000;
 const int SIG_RECT = 0xc0000000;
 const int SIG_FIGURE = 0xc0000000;
 
-// Point
-struct Point
-{
-public:
-  int y1;
-  
-  Point() { 
-    //counts = 1; 
-  }
-  Point( const Point& pt ): y1(pt.y1) { 
-    //counts = 1; 
-  }
-  Point( int y ): y1(y) { 
-    //counts = 1; 
-  }
-  
-  Point& operator=( const Point& other )
-  {
-    y1 = other.y1;
-    return *this;
-  }
-
-  virtual bool in_range( int y ) 
-  {
-    return y == y1;
-  }
-};
-
+// We only use two data structures to represent figures
 // Vertical Line
-struct VLine : public Point
+struct VLine
 {
 public:
-  int y2;
+  int y1, y2;
 
   VLine() { }
 
@@ -63,13 +36,7 @@ public:
     y2 = other.y2;
     return *this;
   }
-
-  bool in_range( int y )
-  {
-    return y1 <= y && y <= y2;
-  }
 };
-
 
 // Full rectangle
 struct Rectangle : public VLine

@@ -14,36 +14,12 @@ const int SIG_VERTICAL = 0x40000000;
 const int SIG_HORIZONTAL = 0x80000000;
 const int SIG_RECT = 0xc0000000;
 
-struct Point
-{
-  int x1, y1;
-
-  Point() { }
-  Point( const Point& pt ): x1(pt.x1), y1(pt.y1) { }
-  Point( int x, int y ): x1(x), y1(y) { }
-
-  Point& operator=( const Point& other )
-  {
-    x1 = other.x1;
-    y1 = other.y1;
-    return *this;
-  }
-
-  Point* clone() {
-    return new Point(*this);
-  }
-
-  virtual int prepare_labels(int* labels)
-  {
-    labels[0] = y1;
-    return 1;
-  }
-};
 
 // Vertical Line
-struct VLine : public Point
+// It represents both points and vertical lines
+struct VLine
 {
-  int y2;
+  int y1, y2;
 
   VLine() { }
   VLine( const VLine& other ) {
@@ -52,44 +28,25 @@ struct VLine : public Point
 
   VLine& operator=( const VLine& other )
   {
-    x1 = other.x1;
     y1 = other.y1;
     y2 = other.y2;
     return *this;
   }
 
-  void cast(VLine** to) { *to = this; }
-  
-  VLine* clone() {
-    return new VLine(*this);
-  }
-};
+  virtual int get_type() { return SIG_VERTICAL; }
 
-// Horizontal Line
-struct HLine : public Point
-{
-  int x2;
-
-  HLine() { }
-  HLine( const HLine& other ) {
-    *this = other;
-  }
-
-  HLine& operator=( const HLine& other )
+  virtual int prepare_labels(int* labels)
   {
-    x1 = other.x1;
-    y1 = other.y1;
-    x2 = other.x2;
-    return *this;
-  }
+    if ( y1 == y2 ) {
+      labels[0] = y1;
+      return 1;
+    }
 
-  void cast(HLine** to) { *to = this; }
-  
-  HLine* clone() {
-    return new HLine(*this);
+    labels[0] = y1 | SIG_VERTICAL;
+    labels[1] = y2;
+    return 2;
   }
 };
-
 
 /*
  * x1, y1: lower left corner
@@ -97,7 +54,7 @@ struct HLine : public Point
  */
 struct Rectangle : public VLine
 {
-  int x2;
+  int x1, x2;
   
   Rectangle() { }
 
@@ -122,28 +79,18 @@ struct Rectangle : public VLine
     return *this;
   }
 
-  void cast(Rectangle** to) { *to = this; }
-
-  Rectangle* clone() {
-    return new Rectangle(*this);
-  }
+  int get_type() { return SIG_RECT; }
 
   // Virtual overloading
   int prepare_labels(int* labels)
   {
     if ( y1 == y2 ) {
-      // A vertical
-      labels[0] = y1 | SIG_VERTICAL;
-      labels[1] = y2;
-      return 2;
-    }
-    else if ( x1 == x2 ) {
       // A horizontal
       labels[0] = y1 | SIG_HORIZONTAL;
       labels[1] = x2;
       return 2;
     }
-
+    
     labels[0] = y1 | SIG_RECT;
     labels[1] = x2;
     labels[2] = y2;
@@ -155,24 +102,20 @@ struct Rectangle : public VLine
 // An structure used to collect the figures
 struct FigureSet
 {
-  vector<Point*> *points;
-  vector<Rectangle*> *rects;
+  vector<VLine*> *rects;
 
   FigureSet()
   {
-    points = new vector<Point*>;
-    rects = new vector<Rectangle*>;
+    rects = new vector<VLine*>;
   }
   
   ~FigureSet()
   {
-    delete points;
     delete rects;
   }
 
   void clear() 
   {
-    points->clear();
     rects->clear();
   }
 };

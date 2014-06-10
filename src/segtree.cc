@@ -16,7 +16,7 @@ static FILE* test_file = NULL;
 // Insert this rectangle into the index
 // Construct new segment tree node when necessary
 static void 
-insert_rectangle( SegTree *p_seg, Point* r, bool is_point )
+insert_rectangle( SegTree *p_seg, int x1, int x2, VLine* r )
 {
   SegTreeNode **unitRoots = p_seg->unitRoots;
 
@@ -24,11 +24,6 @@ insert_rectangle( SegTree *p_seg, Point* r, bool is_point )
   int s = 0, e = p_seg->maxN;
   int mid;
   SegTreeNode *p;
-  int x1, x2;
-  
-  x1 = r->x1;
-  if ( is_point ) x2 = x1; 
-  else x2 = ((Rectangle*)r)->x2;
 
   while ( e >= s ) {
     mid = (s+e) / 2;
@@ -40,10 +35,7 @@ insert_rectangle( SegTree *p_seg, Point* r, bool is_point )
 
     // hit
     if ( x1 <= mid && mid <= x2 ) {
-      if ( is_point )
-	p->points = insert_treap( p->points, r );
-      else
-	p->rects = insert_treap( p->rects, r );
+      p->rects = insert_treap( p->rects, r );
       break;
     }
     
@@ -65,10 +57,7 @@ void collect_figures_visitor( SegTreeNode* pseg, FigureSet* fs )
 {
   // We directly call the treap traversal procedure
   if ( pseg->rects != NULL )
-    visit_treap<Rectangle*>( pseg->rects, fs->rects );
-
-  if ( pseg->points != NULL )
-    visit_treap<Point*>( pseg->points, fs->points );
+    visit_treap<VLine*>( pseg->rects, fs->rects );
 }
 //==================================================================
 
@@ -113,8 +102,7 @@ query_point( SegTree *seg_tree, int x, int y )
   int mid;
   SegTreeNode **unitRoots = seg_tree->unitRoots;
 
-  Rectangle *r;
-  Point *pt;
+  VLine *pl;
   SegTreeNode *p;
 
   while ( e >= s ) {
@@ -122,16 +110,22 @@ query_point( SegTree *seg_tree, int x, int y )
     p = unitRoots[mid];
     if ( p == NULL ) break; 
 
-    // We first search the rectangle set, the cast does not fail
-    r = (Rectangle*)find_treap( p->rects, y );
-    if ( r &&
-	 r->x1 <= x && x <= r->x2 && y <= r->y2 ) return true;
-    
-    if ( x == mid ) {
-      // We then search the points set
-      pt = find_treap( p->points, y );
-      return pt && pt->y1 == y;
+    // We search the figure set
+    pl = find_treap( p->rects, y );
+    if ( pl ) {
+      int type = pl->get_type();
+
+      if ( type == SIG_VERTICAL &&
+	   pl->y2 >= y ) return true;
+
+      if ( type == SIG_RECT ) {
+	Rectangle* r = (Rectangle*)pl;
+	if ( r->x1 <= x && x <= r->x2 && y <= r->y2 ) 
+	  return true;
+      }
     }
+    
+    if ( x == mid ) break;
     
     if ( x > mid ) {
       s = mid + 1;
@@ -151,18 +145,18 @@ query_point( SegTree *seg_tree, int x, int y )
 void 
 insert_segtree_wrapper( SegTree* seg_tree, const Rectangle& r )
 {
-  if ( r.x1 == r.x2 && r.y1 == r.y2 ) {
-    Point *pt = new Point( r );
-    insert_rectangle( seg_tree, pt, true );
+  if ( r.y1 == r.y2 ) {
+    VLine *p = new VLine( r );
+    insert_rectangle( seg_tree, r.x1, r.x2, p);
     
-    (seg_tree->n_points)++;
+    if (r.y1 == r.y2) (seg_tree->n_vertis)++;
+    else (seg_tree->n_points)++;
   }
   else {
     Rectangle *rr = new Rectangle( r );
-    insert_rectangle( seg_tree, rr, false );
+    insert_rectangle( seg_tree, r.x1, r.x2, rr);
     
-    if (r.x1 == r.x2) (seg_tree->n_vertis)++;
-    else if (r.y1 == r.y2) (seg_tree->n_horizs)++;
+    if (r.y1 == r.y2) (seg_tree->n_horizs)++;
     else (seg_tree->n_rects)++;    
   }
 
@@ -188,21 +182,12 @@ dump_figures( SegTree *seg_tree, FILE* fp )
     if ( unitRoots[i] != NULL ) {
       fs->clear();
       collect_figures_visitor( unitRoots[i], fs );
-      vector<Point*> *points = fs->points;
-      vector<Rectangle*> *rects = fs->rects;
+      vector<VLine*> *rects = fs->rects;
 
       // Write out
-      int size = points->size();
-      Point* pt;
+      int size = rects->size();
       for ( int j = 0; j < size; ++j ) {
-	pt = points->at(j);
-	offset += pt->prepare_labels( labels + offset );
-      }
-
-      size = rects->size();
-      Rectangle* r;
-      for ( int j = 0; j < size; ++j ) {
-	r = rects->at(j);
+	VLine *r = rects->at(j);
 	offset += r->prepare_labels( labels + offset );
       }
     }
@@ -236,29 +221,33 @@ flush_left_shapes( SegTree *seg_tree )
       continue;
 
     // Collect
-    vector<Rectangle*> *rects_set = fs->rects;
+    vector<VLine*> *rects_set = fs->rects;
     rects_set->clear();
-    visit_treap<Rectangle*>( segNode->rects, rects_set );
+    visit_treap<VLine*>( segNode->rects, rects_set );
     
     // Redistribute the figures again
     int size = rects_set->size();
     for ( int j = 0; j < size; ++j ) {
-      Rectangle* r = rects_set->at(j);
-
-      if ( r->x1 != i ) {
-	// We first remove this figure
-	segNode->rects = remove_treap( segNode->rects, r->y1 );
+      VLine* r = rects_set->at(j);
+      
+      if ( r->get_type() == SIG_RECT ) {
+	int x1 = ((Rectangle*)r)->x1;
 	
-	// Insert again
-	if (unitRoots[r->x1] == NULL ) {
-	  unitRoots[r->x1] = new SegTreeNode;
+	if ( x1 != i ) {
+	  // We first remove this figure
+	  segNode->rects = remove_treap( segNode->rects, r->y1 );
+	
+	  // Insert again
+	  if (unitRoots[x1] == NULL ) {
+	    unitRoots[x1] = new SegTreeNode;
+	  }
+	
+	  SegTreeNode* p = unitRoots[x1];
+	  p->rects = insert_treap( p->rects, r );
 	}
-	
-	SegTreeNode* p = unitRoots[r->x1];
-	p->rects = insert_treap( p->rects, r );
       }
     }
   }
-
+  
   delete fs;
 }

@@ -15,31 +15,21 @@
 struct TreapNode
 {
   int rkey;                         // A random key used to maintain the heap property
-  Point* data;                      // Only accept the pointer data
+  VLine* data;                      // Only accept the pointer data
   struct TreapNode *left, *right;
   
-  TreapNode( Point *r )
+  TreapNode( VLine *r )
   {
     data = r;
     rkey = std::rand();
     left = right = NULL;
-  }
-  
-  /*
-  ~TreapNode()
-  {
-    if ( data != NULL ) delete data;
-    if ( left != NULL ) delete left;
-    if ( right != NULL ) delete right;
-  }
-  */
+  }  
 };
 
-typedef void (*TREAP_VISITOR)( TreapNode*, void* );
 
 //
-Point* find_treap( TreapNode*, int);
-TreapNode* insert_treap( TreapNode*, Point*);
+VLine* find_treap( TreapNode*, int);
+TreapNode* insert_treap( TreapNode*, VLine*);
 TreapNode* remove_treap( TreapNode*, int);
 void clean_treap( TreapNode* );
 

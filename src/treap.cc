@@ -65,7 +65,7 @@ remove_node( TreapNode* p )
 // -------------------------------------------------------
 
 // A Non-recursive procedure to find the position where a new segment lives in
-Point* find_treap( struct TreapNode *p, int y )
+VLine* find_treap( struct TreapNode *p, int y )
 {
   int diff;
   struct TreapNode *ans = NULL;
@@ -88,7 +88,7 @@ Point* find_treap( struct TreapNode *p, int y )
 
 // We sort the treap nodes by the lower y axis of the contained shapes
 struct TreapNode* 
-insert_treap( struct TreapNode* p, Point *r )
+insert_treap( struct TreapNode* p, VLine *r )
 {
   if ( p == NULL ) {
     // Now we create a new tree node
