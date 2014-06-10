@@ -167,8 +167,10 @@ optimize_seg_tree( QHeader* p )
     p->parent = q->parent;
   }
   
-  optimize_seg_tree( p->left );
-  optimize_seg_tree( p->right );
+  if ( p->left != NULL )
+    optimize_seg_tree( p->left );
+  if ( p->right != NULL )
+    optimize_seg_tree( p->right );
 }
 
 
@@ -220,7 +222,6 @@ process_figures( FILE* fp )
     fread( &buf_size, sizeof(int), 1, fp );
     if ( buf_size == 0 ) continue;
     fread( labels, sizeof(int), buf_size, fp );
-    fprintf( stderr, "%d\n", buf_size );
 
     int i = 0;
     while ( i < buf_size ) {
@@ -414,21 +415,33 @@ binary_search( VECTOR(VLine*) &rects, int y )
   int mid, s, e;
   VLine *r, *tt;
 
-  // Rectangles
-  s = 0; e = rects.size();
-  while ( e > s ) {
-    mid = (s+e) / 2;
-    tt = rects[mid];
-    
-    if ( tt->y2 >= y ) {
-      if ( tt->y1 <= y ) {
-	// Found the closest one
-	return true;
-      }
-      e = mid;
+  s = 0; 
+  e = rects.size();
+
+  if ( e < 3 ) {
+    // fast path
+    while ( s < e ) {
+      tt = rects[s];
+      if ( tt->y2 >= y &&
+	   tt->y1 <= y ) return true;
+      ++s;
     }
-    else
-      s = mid + 1;
+  }
+  else {
+    while ( e > s ) {
+      mid = (s+e) / 2;
+      tt = rects[mid];
+      
+      if ( tt->y2 >= y ) {
+	if ( tt->y1 <= y ) {
+	  // Found the closest one
+	  return true;
+	}
+	e = mid;
+      }
+      else
+	s = mid + 1;
+    }
   }
 
   return false;
@@ -526,7 +539,9 @@ ListAliases( int x, VECTOR(int) *es2baseptrs )
       VISIT_POINT(i);
     }
   }
-  
+
+  p = unitRoots[x];
+
   // Visit the verticals
   VECTOR(VLine*) &vertis = p->vertis;
   size = vertis.size();
@@ -535,8 +550,7 @@ ListAliases( int x, VECTOR(int) *es2baseptrs )
     VISIT_RECT(r);
   }
 
-  // traverse the rectangles
-  p = unitRoots[x];
+  // traverse the rectangles up the tree
   while ( p != NULL ) {
     VECTOR(VLine*) &rects = p->rects;
     size = rects.size();
@@ -671,7 +685,7 @@ traverse_result()
     switch (query_type) {
     case IS_ALIAS:
       y = n_query - x;
-      ans += IsAlias( x, y ) == true ? 1 : 0;
+      ans += (IsAlias( x, y ) == true ? 1 : 0);
       break;
       
     case LIST_POINTS_TO:
