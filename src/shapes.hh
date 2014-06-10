@@ -10,14 +10,13 @@
 using std::vector;
 
 const int SIG_POINT = 0;
-const int SIG_VERTICAL = 0x04000000;
+const int SIG_VERTICAL = 0x40000000;
 const int SIG_HORIZONTAL = 0x80000000;
 const int SIG_RECT = 0xc0000000;
 
 struct Point
 {
   int x1, y1;
-  bool used;
 
   Point() { }
   Point( const Point& pt ): x1(pt.x1), y1(pt.y1) { }
