@@ -195,21 +195,25 @@ dump_figures( SegTree *seg_tree, FILE* fp )
 
       // Write out
       int size = points->size();
+      Point* pt;
       for ( int j = 0; j < size; ++j ) {
-	Point* p = points->at(j);
-	offset += p->prepare_labels( labels + offset );
+	pt = points->at(j);
+	offset += pt->prepare_labels( labels + offset );
       }
 
       size = rects->size();
+      Rectangle* r;
       for ( int j = 0; j < size; ++j ) {
-	Rectangle* r = rects->at(j);
+	r = rects->at(j);
 	offset += r->prepare_labels( labels + offset );
+	if ( offset == 451 )
+	  printf( "stop\n" );
       }
 
       labels[0] = offset - 1;
-      total_labels += offset;
     }
 
+    total_labels += offset;
     fwrite( labels, sizeof(int), offset, fp );
   }
 

@@ -177,9 +177,6 @@ insert_point( int x, int y )
 {
   VLine* p = new VLine(y, y);
   unitRoots[x]->add_vertis(p);
-  
-  p = new VLine(x, x);
-  unitRoots[y]->add_vertis(p);
 }
 
 /*
@@ -230,24 +227,25 @@ process_figures( FILE* fp )
       int y1 = labels[i++];
       int x2, y2;
 
-      if ( (y1&SIG_RECT) == 0 ) {
+      if ( (y1&SIG_FIGURE) == SIG_POINT ) {
 	// This is a point, directly insert it
-	insert_point( x1, y1);
+	insert_point( x1, y1 );
+	insert_point( y1, x1 );
 	continue;
       }
 
-      if ( (y1&SIG_VERTICAL) == SIG_VERTICAL ) {
-	y1 ^= SIG_VERTICAL;
+      if ( (y1&SIG_FIGURE) == SIG_VERTICAL ) {
+	y1 &= ~SIG_VERTICAL;
 	y2 = labels[i++];
 	x2 = x1;
       }
-      else if ( (y1&SIG_HORIZONTAL) == SIG_HORIZONTAL ) {
-	y1 ^= SIG_HORIZONTAL;
+      else if ( (y1&SIG_FIGURE) == SIG_HORIZONTAL ) {
+	y1 &= ~SIG_HORIZONTAL;
 	x2 = labels[i++];
 	y2 = y1;
       }
       else {
-	y1 ^= SIG_RECT;
+	y1 &= ~SIG_RECT;
 	x2 = labels[i++];
 	y2 = labels[i++];
       }
