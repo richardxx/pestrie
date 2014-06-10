@@ -145,21 +145,20 @@ query_point( SegTree *seg_tree, int x, int y )
 void 
 insert_segtree_wrapper( SegTree* seg_tree, const Rectangle& r )
 {
-  if ( r.y1 == r.y2 ) {
-    VLine *p = new VLine( r );
-    insert_rectangle( seg_tree, r.x1, r.x2, p);
-    
-    if (r.y1 == r.y2) (seg_tree->n_vertis)++;
-    else (seg_tree->n_points)++;
+  VLine* p = NULL;
+
+  if ( r.x1 == r.x2 ) {
+    p = new VLine( r );
+    if (r.y1 == r.y2) (seg_tree->n_points)++;
+    else (seg_tree->n_vertis)++;
   }
   else {
-    Rectangle *rr = new Rectangle( r );
-    insert_rectangle( seg_tree, r.x1, r.x2, rr);
-    
+    p = new Rectangle( r );
     if (r.y1 == r.y2) (seg_tree->n_horizs)++;
     else (seg_tree->n_rects)++;    
   }
 
+  insert_rectangle( seg_tree, r.x1, r.x2, p);
   seg_tree->n_pairs += (r.x2-r.x1+1) * (r.y2-r.y1+1);
   //fprintf( test_file, "(%d, %d, %d, %d)\n", r.x1, r.x2, r.y1, r.y2 );
 }
