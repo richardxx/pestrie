@@ -270,53 +270,6 @@ PesTrie::profile_additional()
   int *es_size = this->es_size;
   bitmap* mat_T = this->mat_T;
   int *r_count = this->r_count;
-  int *alias_count = this->alias_count;
-
-
-  // object induced alias frequency + tree size
-  if ( 0 && this->index_type == PT_MATRIX ) {
-    histogram obj_freq;
-    long freq_scales[] = { 10, 100, 1000, 5000 };
-    obj_freq.push_scales( freq_scales, 4 );
-
-    histogram tr_sizes;
-    long size_scales[] = { 5, 50, 100, 200 };
-    tr_sizes.push_scales( size_scales, 4 );
-
-    // We first collect the #of internal pairs
-    int *tr_sz = new int[cm];
-    memset( tr_sz, 0, sizeof(int) * cm );
-    
-    for ( int i = cm; i < vn; ++i ) {
-      int tr_code = pes[i];
-      tr_sz[tr_code]++;
-    }
-    
-    long tot_internals = 0;
-    long tot_pairs = 0;
-
-    for ( int i = 0; i < cm; ++i ) {
-      int sz = tr_sz[i] + 1;
-      
-      int n_internal = sz * (sz-1) / 2;
-      tot_internals += sz;
-      alias_count[i] += n_internal; 
-      tot_pairs += alias_count[i];
-
-      obj_freq.add_sample( alias_count[i] );
-      tr_sizes.add_sample( n_internal );
-    }
-  
-    delete[] tr_sz;
-
-    fprintf( stderr, "Internal pairs = %lld, All pairs = %lld, percent = %.2lf\n",
-	     tot_internals, tot_pairs, (double)tot_internals/tot_pairs );
-
-    obj_freq.print_result( stderr, "Alias Groups Sizes", false );
-    obj_freq.print_weights( stderr, "Alias Groups Weighted Sizes", false );
-    tr_sizes.print_result( stderr, "Internal Pairs", false );
-  }
-
 
   // We profile the objects (pointed-to sizes + hub degrees)
   if ( 1 ) {
@@ -390,19 +343,6 @@ PesTrie::profile_additional()
     pted_sizes.print_result( stderr, "Pointed-to-by Matrix", false );
   }
       
-  // We profile the percentage of alias pairs introduced by first k% trees
-  if ( 0 ) {
-    histogram pt_seen;
-    long percents[] = { cm/1000, cm/100, cm/50, cm/10, cm/5 };
-    pt_seen.push_scales( percents, 5 );
-    
-    for ( int i = 0; i < cm; ++i ) {
-      pt_seen.add_sample( i, alias_count[i] );
-    }
-    
-    pt_seen.print_weights( stderr, "Alias pairs introduced by the first K trees.." );
-  }
-
   // We profile the cross edges (#cross edges for each subtree)
   if ( 1 ) {
     int tot_cross_edges = 0;

@@ -94,7 +94,6 @@ public:
   // Index and descriptions
   SegTree *seg_tree;
   int n_gen_rects;
-  int *alias_count;        // Record #of alias pairs for each tree
 
   // User provided constrols
   const PesOpts* pes_opts;
@@ -121,7 +120,6 @@ public:
     preV = NULL;
     lastV = NULL;
     seg_tree = NULL;
-    alias_count = NULL;
     pes_opts = opts;
   }
   
@@ -144,7 +142,6 @@ public:
     if ( lastV != NULL ) delete[] lastV;
     
     if ( seg_tree != NULL ) delete seg_tree;
-    if ( alias_count != NULL ) delete[] alias_count;
     pes_opts = NULL;
   }
 

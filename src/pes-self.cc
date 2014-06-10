@@ -125,23 +125,19 @@ PesTrieSelf::build_index()
   // Then, the auxiliary data structures
   int *vis = new int[cm];
   int *Queue = new int[cm];
-  int *alias_count = new int[cm];
   CrossEdgeRep **groups = new CrossEdgeRep*[cm];   // Help classify the cross edges of the same root
   SegTree* seg_tree = build_segtree( 0, vn );
   
   memset( groups, 0, sizeof(void*) * cm );
   memset( vis, 0, sizeof(int) * cm );
-  alias_count[0] = 0;
-
+  
   // For statistics use
   int n_gen_rects = 0;
-  //int n_pairs = 0;
 
   // We iteratively insert all rectangles
   for ( k = 1; k < cm; ++k ) {
     vector<CrossEdgeRep*> &treeK = cross_edges[k];
     int size = treeK.size();
-    int n_pairs = 0;
 
     // Pair up the cross pointers and local pointers
     r.y1 = preV[k];
@@ -164,7 +160,6 @@ PesTrieSelf::build_index()
       insert_segtree_wrapper( seg_tree, r );
       
       ++n_gen_rects;
-      n_pairs += (r.x2 - r.x1 + 1) * (r.y2 - r.y1 + 1);
 
       // Group the cross edges according to their tree values
       // Here, vis is used to mark if a particular tree has been visited
@@ -187,7 +182,6 @@ PesTrieSelf::build_index()
       groups[tr] = NULL;
     }
     else {
-
       sort( Queue, Queue + tail );
 
       /*
@@ -212,7 +206,6 @@ PesTrieSelf::build_index()
 	      // Insert
 	      if ( query_point( seg_tree, r.x1, r.y1 ) == false ) {
 		insert_segtree_wrapper( seg_tree, r );
-		n_pairs += (r.x2 - r.x1 + 1) * (r.y2 - r.y1 + 1);
 	      }
 	      ++n_gen_rects;
 	      q = q -> next;
@@ -222,15 +215,12 @@ PesTrieSelf::build_index()
 	}
       }
     }
-
-    alias_count[k] = n_pairs;
   }
   
   // Assign back
   this->seg_tree = seg_tree;
   this->n_gen_rects = n_gen_rects;
-  this->alias_count = alias_count;
-
+  
   delete[] groups;
   delete[] Queue;
 
