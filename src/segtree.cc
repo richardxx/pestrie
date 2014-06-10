@@ -163,8 +163,7 @@ insert_segtree_wrapper( SegTree* seg_tree, const Rectangle& r )
     
     if (r.x1 == r.x2) (seg_tree->n_vertis)++;
     else if (r.y1 == r.y2) (seg_tree->n_horizs)++;
-    else (seg_tree->n_rects)++;
-    
+    else (seg_tree->n_rects)++;    
   }
 
   seg_tree->n_pairs += (r.x2-r.x1+1) * (r.y2-r.y1+1);
@@ -184,7 +183,6 @@ dump_figures( SegTree *seg_tree, FILE* fp )
   // Visit the figures
   for ( int i = 0; i < maxN; ++i ) {
     // Reset
-    labels[0] = 0;
     int offset = 1;
 
     if ( unitRoots[i] != NULL ) {
@@ -206,13 +204,10 @@ dump_figures( SegTree *seg_tree, FILE* fp )
       for ( int j = 0; j < size; ++j ) {
 	r = rects->at(j);
 	offset += r->prepare_labels( labels + offset );
-	if ( offset == 451 )
-	  printf( "stop\n" );
       }
-
-      labels[0] = offset - 1;
     }
 
+    labels[0] = offset - 1;
     total_labels += offset;
     fwrite( labels, sizeof(int), offset, fp );
   }
