@@ -151,6 +151,7 @@ struct Rectangle : public VLine
   }
 };
 
+#ifndef USE_OWN_FIGURE_SET
 // An structure used to collect the figures
 struct FigureSet
 {
@@ -175,5 +176,7 @@ struct FigureSet
     rects->clear();
   }
 };
+
+#endif
 
 #endif

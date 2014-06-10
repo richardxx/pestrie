@@ -3,6 +3,8 @@
  * richardxx, 2012.9
  */
 
+#define USE_OWN_FIGURE_SET
+
 #include <vector>
 #include <cmath>
 #include <algorithm>
