@@ -11,7 +11,7 @@
 #include <cstring>
 #include <vector>
 #include <set>
-#include "options.h"
+#include "constants.hh"
 #include "profile_helper.h"
 #include "matrix-ops.hh"
 #include "kvec.hh"

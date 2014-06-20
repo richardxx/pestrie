@@ -4,7 +4,8 @@
  * Initiated 2011.8
  * Improved 2012.7: improve the alias query to O(lgn) practical performance.
  * Improved 2012.10: fix bugs and code refactoring.
- * Improved 2014.02: fix bugs and improve performance significantly.
+ * Improved 2014.02: fix bugs and improve performance.
+ * Improved 2015.05: significantly improve the decoding performance and querying memory usage
  */
 
 #include <cstdio>
@@ -14,127 +15,25 @@
 #include <ctime>
 #include <set>
 #include "query.h"
+#include "pes-querier.hh"
 #include "profile_helper.h"
-#include "kvec.hh"
 #include "histogram.hh"
 #include "bitmap.h"
-#include "matrix-ops.hh"
 
 using namespace std;
 
-#define VECTOR(T) kvec_t(T)
-//#define VECTOR(T) vector<T>
+// The querying segment tree
+static QHeader **segUnits, *segRoot;
 
-
-// Point
-class Point
-{
-public:
-  int y1;
-  //int counts;   // For garbage collection
-
-  Point() { 
-    //counts = 1; 
-  }
-  Point( const Point& pt ): y1(pt.y1) { 
-    //counts = 1; 
-  }
-  Point( int y ): y1(y) { 
-    //counts = 1; 
-  }
-  
-  Point& operator=( const Point& other )
-  {
-    y1 = other.y1;
-    return *this;
-  }
-
-  virtual bool in_range( int y ) 
-  {
-    return y == y1;
-  }
-};
-
-// Vertical Line
-class VLine : public Point
-{
-public:
-  int y2;
-
-  VLine() { }
-
-  VLine( int y1, int y2 ) { this->y1 = y1; this->y2 = y2; }
-  
-  VLine( const VLine* other ) { this->y1 = other->y1; this->y2 = other->y2; }
-  
-  VLine& operator=( const VLine& other )
-  {
-    y1 = other.y1;
-    y2 = other.y2;
-    return *this;
-  }
-
-  bool in_range( int y )
-  {
-    return y1 <= y && y <= y2;
-  }
-  
-  // Memory allocator
-  static void init_buffer( int sz ) { 
-    vline_buf = new VLine[sz]; 
-    VLine::vline_buf_cur = 0; 
-  }
-  static VLine* get_vline(int y1, int y2) { 
-    VLine* vl = VLine::vline_buf + (VLine::vline_buf_cur++); 
-    vl->y1 = y1; vl->y2 = y2; 
-    return vl; 
-  }
-  static void release_buffer() { 
-    delete[] VLine::vline_buf; 
-  }
-  
-private:
-  static VLine* vline_buf;
-  static int vline_buf_cur;
-};
-
-VLine* VLine::vline_buf = NULL;
-int VLine::vline_buf_cur = 0;
-
-
-// Structure for query plane
-struct QHeader
-{
-  int x;
-  VECTOR(VLine*) rects;
-  VECTOR(int) pointsto;
-  //bitmap pointsto;
-
-  QHeader( int xx )
-  {
-    x = xx;
-    //pointsto = BITMAP_ALLOC(NULL);
-  }
-
-  void add_rect( VLine* p ) { rects.push_back(p); }
-  void add_point( int p ) { 
-    pointsto.push_back(p); 
-    //bitmap_set_bit(pointsto, p);
-  }
-};
-
-
-/*
- * Cut off the rectangles into strip pieces.
- */
-static QHeader** unitRoots;
-
+// Points-to or side-effect information
 static int index_type;
+
+// The maximum preorder timestamp for the store statements
 static int max_store_prev;
 
 // The number of pointers and objects
 static int n, m, n_trees, n_es;
-static int vertex_num, n_rects, n_verticals, n_horizontals, n_points;
+static int vertex_num, n_figures;
 // Mapping from pointer ID to tree ID
 static int *tree;
 // Mapping from pointer ID to PesTrie ID
@@ -158,10 +57,7 @@ prepare_pestrie_info( FILE* fp )
   fread( &n, sizeof(int), 1, fp );
   fread( &m, sizeof(int), 1, fp );
   fread( &vertex_num, sizeof(int), 1, fp );
-  fread( &n_rects, sizeof(int), 1, fp );
-  fread( &n_verticals, sizeof(int), 1, fp );
-  fread( &n_horizontals, sizeof(int), 1, fp );
-  fread( &n_points, sizeof(int), 1, fp );
+  fread( &n_figures, sizeof(int), 1, fp );
 
   tree = new int[n+m];
   preV = new int[n+m];
@@ -235,42 +131,79 @@ prepare_pestrie_info( FILE* fp )
   }
 }
 
-static QHeader* get_root(int x)
+static QHeader*
+build_seg_tree( int l, int r )
 {
-  struct QHeader *p = unitRoots[x];
-  if ( p == NULL ) {
-    p = new QHeader(x);
-    unitRoots[x] = p;
+  int x = (l+r) / 2;
+  QHeader* p = new QHeader; 
+  
+  p->x1 = l;
+  p->x2 = r;
+  
+  if ( l != r ) {
+    if ( l <= x ) {
+      p->left = build_seg_tree( l, x );
+      p->left->parent = p;
+    }
+    
+    if ( x < r ) {
+      p->right = build_seg_tree( x + 1, r ); 
+      p->right->parent = p;
+    }
   }
+
+  segUnits[x] = p;
   return p;
 }
 
 /*
- * In the x1 <= x <= x2, we insert the vertial line pr.
- */
-static void 
-insert_vertis( int x1, int x2, VLine* pr )
+ * We update the parent links to skip the empty nodes.
+ */ 
+static void
+optimize_seg_tree( QHeader* p ) 
 {
-  // Inser the rectangle
-  for ( int x = x1; x <= x2; ++x ) {
-    get_root(x)->add_rect(pr);
+  QHeader* q = p->parent;
+  
+  if ( q != NULL &&
+       q->n_of_rects() == 0 ) {
+    q = q->parent;
+    p->parent = q;
   }
   
-  // Inser the inversed rectangle
-  VLine* pr_prime = VLine::get_vline(x1, x2);
-  x1 = pr->y1;
-  x2 = pr->y2;
+  if ( q == NULL )
+    p->merged = true;
 
-  for ( int x = x1; x <= x2; ++x ) {
-    get_root(x)->add_rect(pr_prime);
-  }
+  if ( p->left != NULL )
+    optimize_seg_tree( p->left );
+  if ( p->right != NULL )
+    optimize_seg_tree( p->right );
 }
+
 
 static void
 insert_point( int x, int y )
 {
-  VLine* p = VLine::get_vline(y, y);
-  get_root(x)->add_rect(p);
+  VLine* p = new VLine(y, y);
+  segUnits[x]->add_vertis(p);
+}
+
+/*
+ * We add log(n) references to each figure.
+ */
+static void 
+insert_rect( int x1, int x2, VLine* pr, QHeader* p )
+{
+  if ( x1 <= p->x1 && x2 >= p->x2 ) {
+    // We only consider the full coverage
+    p->add_rect(pr);
+    return;
+  }
+
+  int x = (p->x1 + p->x2) / 2;
+  p = segUnits[x];
+  
+  if ( x1 < x ) insert_rect( x1, x2, pr, p->left );
+  if ( x2 > x ) insert_rect( x1, x2, pr, p->right );
 }
 
 static bool comp_rect( VLine* r1, VLine* r2 )
@@ -281,103 +214,79 @@ static bool comp_rect( VLine* r1, VLine* r2 )
 static void
 process_figures( FILE* fp )
 {
-  VLine::init_buffer((n_rects + n_verticals + n_horizontals + n_points)*2);
-  unitRoots = new QHeader*[vertex_num];
-  memset( unitRoots, 0, sizeof(void*) * vertex_num );
+  // First we initialize the segment tree
+  segUnits = new QHeader*[vertex_num];
+  segRoot = build_seg_tree( 0, vertex_num );
 
-  int max_buf = 0;
-  if ( n_rects*4 > max_buf ) max_buf = n_rects*4;
-  if ( n_verticals*3 > max_buf ) max_buf = n_verticals*3;
-  if ( n_horizontals*3 > max_buf ) max_buf = n_horizontals*3;
-  if ( n_points*2 > max_buf ) max_buf = n_points*2;
+  // We insert the figures into the tree
+  int buf_size;
+  int *labels = new int[vertex_num * 3];
+  VECTOR(Rectangle*) all_rects(vertex_num);
 
-  int *labels = new int[max_buf];
- 
-  // Rectangles
-  fread( labels, sizeof(int), 4*n_rects, fp );
-  for ( int i = 0, k = 0; i < n_rects; ++i, k+=4 ) {
-    VLine* pr = VLine::get_vline(labels[k+1], labels[k+3]);
-    int x1 = labels[k];
-    int x2 = labels[k+2];
-    insert_vertis( x1, x2, pr );
-  }
-  
-  // Vertical lines
-  fread( labels, sizeof(int), 3*n_verticals, fp );
-  for ( int i = 0, k = 0; i < n_verticals; ++i, k+=3 ) {
-    VLine* pr = VLine::get_vline(labels[k], labels[k+2]);
-    int x = labels[k+1];
-    insert_vertis( x, x, pr );
-  }
+  for ( int x1 = 0; x1 < vertex_num; ++x1 ) {
+    fread( &buf_size, sizeof(int), 1, fp );
+    if ( buf_size == 0 ) continue;
+    fread( labels, sizeof(int), buf_size, fp );
 
-  // Horizontal lines
-  fread( labels, sizeof(int), 3*n_horizontals, fp );
-  for ( int i = 0, k = 0; i < n_horizontals; ++i, k+=3 ) {
-    VLine* pr = VLine::get_vline(labels[k], labels[k+2]);
-    // We build the vertical and insert it
-    // Since we also insert the reverse rectangle, the insertion order does not matter
-    int x = labels[k+1];
-    insert_vertis( x, x, pr );
-  }
-  
-  // Points
-  // special
-  while ( n_points > 0 ) {
-    // Read #of shared points and the X label
-    int count, x, y;
-    /*
-    fread( &count, sizeof(int), 1, fp );
-    fread( labels, sizeof(int), 1 + count, fp );
-    */
-    fread( &x, sizeof(int), 1, fp );
-    fread( &count, sizeof(int), 1, fp );
-    fread( labels, sizeof(int), count, fp );
-    n_points -= count;
-    
-    for ( int k = 0; k < count; ++k ) {
-      y = labels[k];
-      insert_point( x, y );
-      insert_point( y, x );
+    int i = 0;
+    while ( i < buf_size ) {
+      int y1 = labels[i++];
+      int x2, y2;
+
+      if ( (y1&SIG_FIGURE) == SIG_POINT ) {
+	// This is a point, directly insert it
+	insert_point( x1, y1 );
+	insert_point( y1, x1 );
+	continue;
+      }
+
+      if ( (y1&SIG_FIGURE) == SIG_VERTICAL ) {
+	y1 &= ~SIG_VERTICAL;
+	y2 = labels[i++];
+	x2 = x1;
+      }
+      else if ( (y1&SIG_FIGURE) == SIG_HORIZONTAL ) {
+	y1 &= ~SIG_HORIZONTAL;
+	x2 = labels[i++];
+	y2 = y1;
+      }
+      else {
+	y1 &= ~SIG_RECT;
+	x2 = labels[i++];
+	y2 = labels[i++];
+      }
+
+      // First, the reversed rect
+      VLine* p = new VLine(x1, x2);
+      if ( y1 == y2 ) {
+	segUnits[y1]->add_vertis(p);
+      }
+      else {
+	insert_rect( y1, y2, p, segRoot );
+      }
+
+      // Second, cache it
+      Rectangle* r = new Rectangle(x1, x2, y1, y2);
+      if ( x1 == x2 ) {
+	segUnits[x1]->add_vertis(r);
+      }
+      else {
+	all_rects.push_back(r);
+      }
     }
   }
 
-  delete[] labels;
-}
+  // We insert the cached rectangle
+  sort( all_rects.begin(), all_rects.end(), comp_rect );
+  int size = all_rects.size();
 
-
-static void 
-extract_points_to(struct QHeader *p)
-{
-  // We only extract points-to info from the case-1 rectangles
-  VECTOR(VLine*) &rects = p->rects;
-  int size = rects.size();
-  
   for ( int i = 0; i < size; ++i ) {
-    VLine *r = rects[i];
-    int v = r->y1;
-    int tr = root_tree[v];
-    if ( tr != -1 ) {
-      /*
-      // We directly construct the uncompressed matrix
-      VECTOR(int) &objs = es2objs[tr];
-      int ob_size = objs.size();
-      for ( int k = 0; k < ob_size; ++k )
-	pointsto.push_back( objs[k] );
-      */
-      p->add_point(tr);
-    }
+    Rectangle* r = all_rects[i];
+    insert_rect( r->x1, r->x2, r, segRoot );
   }
-}
 
-static void 
-build_query_header( QHeader *p )
-{
-  // Sort the rects
-  VECTOR(VLine*) &rects = p->rects;
-  sort( rects.begin(), rects.end(), comp_rect );
-  
-  // Sort the points
-  extract_points_to(p);
+  optimize_seg_tree( segRoot );
+  delete[] labels;
 }
 
 static bool 
@@ -407,11 +316,6 @@ read_index()
   // Loading and decoding the persistence file
   prepare_pestrie_info(fp);
   process_figures(fp);
-  
-  // Prepare the quering plane and points-to matrix
-  for ( int i = 0; i < vertex_num; ++i )
-    if ( unitRoots[i] != NULL )
-      build_query_header( unitRoots[i] );
 
   fprintf( stderr, "\n-------Input: %s-------\n", input_file );
   show_res_use( "Index loading" );
@@ -433,20 +337,17 @@ profile_pestrie()
       ++non_empty_nodes;
 
     // Test 2:
-    struct QHeader* p = unitRoots[i];
-    if ( p != NULL ) {
-      n_rects += p->rects.size();
-      n_pts += p->pointsto.size();
-      //n_pts += bitmap_count_bits( p->pointsto );
-    }
+    struct QHeader* p = segUnits[i];
+    n_rects += p->rects.size();
+    n_pts += p->vertis.size();
   }
-
+  
   n_pts += non_empty_nodes;
-
+  
   fprintf( stderr, "Trees = %d, ES = %d, Non-empty ES = %d\n", 
 	   n_trees, vertex_num, non_empty_nodes );
-  fprintf( stderr, "Number of rects = %d, points-to relations = %d\n", 
-	   n_rects, n_pts ); 
+  fprintf( stderr, "Number of rects = %d\n", 
+	   n_rects + n_pts ); 
 }
 
 static int
@@ -465,12 +366,98 @@ iterate_equivalent_set( VECTOR(int) *es_set )
   return ans;
 }
 
+// We do merging sort
+static void
+recursive_merge( QHeader* p )
+{
+  if ( p->merged == true ) return;  
+  if ( p->parent == NULL ) return;
+  recursive_merge( p->parent );
+
+  VECTOR(VLine*) &list1 = p->parent->rects;
+  int sz1 = list1.size();
+  int sz2 = p->rects.size();
+
+  if ( sz1 != 0 ) {
+    // We have something to merge top down
+    VECTOR(VLine*) &list3 = p->rects;
+    if ( sz2 == 0 ) {
+      // Fast path, just copy
+      list3.add_all( list1 );
+    }
+    else {
+      VECTOR(VLine*) list2;
+      list2.add_all( list3 );
+      list3.clear();
+
+      int i = 0, j = 0;
+      VLine *r1 = list1[0], *r2 = list2[0];
+      
+      while ( r1 != NULL || r2 != NULL ) {
+	if ( r2 == NULL || 
+	     ( r1 != NULL && r1->y1 < r2->y1 ) ) {
+	  list3.push_back(r1);
+	  ++i;
+	  if ( i >= sz1 ) r1 = NULL;
+	  else r1 = list1[i];
+	}
+	else {
+	  list3.push_back(r2);
+	  ++j;
+	  if ( j >= sz2 ) r2 = NULL;
+	  else r2 = list2[j];
+	}
+      }
+    }
+  }
+
+  p->merged = true;
+}
+
+static bool
+binary_search( VECTOR(VLine*) &rects, int y )
+{
+  int mid, s, e;
+  VLine *r, *tt;
+
+  s = 0; 
+  e = rects.size();
+  /*
+  if ( e < 3 ) {
+    // fast path
+    while ( s < e ) {
+      tt = rects[s];
+      if ( tt->y2 >= y &&
+	   tt->y1 <= y ) return true;
+      ++s;
+    }
+  }
+  else {
+  */
+    while ( e > s ) {
+      mid = (s+e) / 2;
+      tt = rects[mid];
+      
+      if ( tt->y2 >= y ) {
+	if ( tt->y1 <= y ) {
+	  // Found the closest one
+	  return true;
+	}
+	e = mid;
+      }
+      else
+	s = mid + 1;
+    }
+    //  }
+
+  return false;
+}
+
+
 static bool
 IsAlias( int x, int y )
 {
   struct QHeader *p;
-  int mid, s, e;
-  VLine *r, *tt;
 
   int tr_x = tree[x];
   if ( tr_x == -1 ) return false;
@@ -482,30 +469,28 @@ IsAlias( int x, int y )
   }
 
   x = preV[x];
-  p = unitRoots[x];
-  if ( p == NULL ) return false;
   y = preV[y];
+  p = segUnits[x];
 
-  // Now we use binary search for static point location query
-  VECTOR(VLine*) &rects = p->rects;
-  
-  // Rectangles
-  s = 0; e = rects.size();
-  while ( e > s ) {
-    mid = (s+e) / 2;
-    tt = rects[mid];
-    
-    if ( tt->y2 >= y ) {
-      if ( tt->y1 <= y ) {
-	// Found the closest one
-	return true;
-      }
-      e = mid;
-    }
-    else
-      s = mid + 1;
+  // Search the verticals special to this x axis
+  if ( binary_search( p->vertis, y ) ) 
+    return true;
+
+  /*
+  // We traverse the segment tree bottom up
+  while ( p != NULL ) {    
+    if ( binary_search( p->rects, y ) ) 
+      return true;
+    p = p->parent;
   }
-    
+  */
+
+  if ( p->merged == false )
+    recursive_merge(p);
+
+  if ( binary_search( p->rects, y ) )
+    return true;
+
   return false;
 }
 
@@ -521,34 +506,12 @@ ListPointsTo( int x )
   int tr = tree[x];
   if ( tr == -1 ) return 0;
   
-
   // Don't forget x -> tree[x]
   objs = &es2objs[tr];
   ans += iterate_equivalent_set( objs );
   
   x = preV[x];
-  p = unitRoots[x];
-  if ( p != NULL ) {
-    // Traverse the points-to list
-    /*
-    bitmap pointsto = p->pointsto;
-    unsigned o;
-    bitmap_iterator bi;
-    EXECUTE_IF_SET_IN_BITMAP( pointsto, 0, o, bi ) {
-      objs = &es2objs[o];
-      ans += iterate_equivalent_set( objs );
-    }
-    */
-
-    VECTOR(int) &pointsto = p->pointsto;
-    int size = pointsto.size();
-    for ( int i = 0; i < size; ++i ) {
-      tr = pointsto[i];
-      objs = &es2objs[tr];
-      ans += iterate_equivalent_set( objs );
-    }
-    
-  }
+  p = segUnits[x];
   
   return ans;
 }
@@ -567,36 +530,49 @@ ListAliases( int x, VECTOR(int) *es2baseptrs )
   int ans = 0;
   x = preV[x];
 
-#define VISIT(es)							\
+#define VISIT_POINT(v)							\
+  do {									\
+    VECTOR(int) *ptrs = ( es2baseptrs == NULL ? &es2pointers[v] : &es2baseptrs[v] ); \
+    ans += iterate_equivalent_set( ptrs );				\
+  } while(0)
+
+#define VISIT_RECT(r)							\
+  do {									\
+    int lower = r->y1;							\
+    int upper = r->y2;							\
     do {								\
-      VECTOR(int) *ptrs = ( es2baseptrs == NULL ? &es2pointers[es] : &es2baseptrs[es] ); \
-      ans += iterate_equivalent_set( ptrs );				\
-    } while(0)
+      VISIT_POINT(lower);						\
+      ++lower;								\
+    } while ( lower <= upper );						\
+  } while(0)
 
   // We first extract the ES groups that belong to the same subtree
   {
     int upper = root_prevs[tr+1];
     for ( int i = root_prevs[tr]; i < upper; ++i ) {
-      VISIT(i);
+      VISIT_POINT(i);
     }
   }
-  
-  // traverse index figures
-  p = unitRoots[x];
-  if ( p != NULL ) {
+
+  p = segUnits[x];
+
+  // Visit the verticals
+  VECTOR(VLine*) &vertis = p->vertis;
+  size = vertis.size();
+  for ( int i = 0; i < size; ++i ) {
+    VLine* r = vertis[i];
+    VISIT_RECT(r);
+  }
+
+  // traverse the rectangles up the tree
+  while ( p != NULL ) {
     VECTOR(VLine*) &rects = p->rects;
-    
-    // Rects
     size = rects.size();
     for ( int i = 0; i < size; ++i ) {
       r = rects[i];
-      int lower = r->y1;
-      int upper = r->y2;
-      do {
-	VISIT(lower);
-	++lower;
-      } while ( lower <= upper );
+      VISIT_RECT(r);
     }
+    p = p->parent;
   }
   
   return ans;
@@ -723,7 +699,7 @@ traverse_result()
     switch (query_type) {
     case IS_ALIAS:
       y = n_query - x;
-      ans += IsAlias( x, y ) == true ? 1 : 0;
+      ans += (IsAlias( x, y ) == true ? 1 : 0);
       break;
       
     case LIST_POINTS_TO:
@@ -765,15 +741,9 @@ int main( int argc, char** argv )
 
   query_plan != NULL ? execute_query_plan() : traverse_result();
   
-  // if ( query_type == IS_ALIAS ) {
-  //   long total = (long)n_query * (n_query -1);
-  //   fprintf ( stderr, "Direct answers = %d, total = %lld\n", cnt_same_tree, total/2 );
-  // }
-
   char buf[128];
   sprintf( buf, "%s querying", query_strs[query_type] );
   show_res_use( buf );
 
-  VLine::release_buffer();
   return 0;
 }

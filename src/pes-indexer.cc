@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <cstdlib>
-#include "options.h"
+#include "constants.hh"
 #include "pestrie.hh"
 #include "profile_helper.h"
 #include "segtree.hh"

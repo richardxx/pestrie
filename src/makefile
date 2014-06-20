@@ -31,8 +31,8 @@ treap.o : treap.hh treap.cc
 segtree.o : segtree.hh segtree.cc
 	$(CC) segtree.cc $(CFLAGS) $(LIB) -c
 
-pes-common-exp.o : pestrie.hh pes-common-exp.cc
-	$(CC) pes-common-exp.cc $(CFLAGS) $(LIB) -c
+pes-common.o : pestrie.hh pes-common.cc
+	$(CC) pes-common.cc $(CFLAGS) $(LIB) -c
 
 pes-self.o : segtree.hh pes-self.cc
 	$(CC) pes-self.cc $(CFLAGS) $(LIB) -c
@@ -55,8 +55,8 @@ pesI: pes-indexer.cc  $(BASIC_DEPS_H) $(PESTRIE_DEPS_H) $(PESTRIE_DEPS_C) $(BASI
 bitI: bit-indexer.cc $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(BITINDEX_DEPS_C) $(BITINDEX_DEPS_H)
 	$(CC) bit-indexer.cc $(BASIC_DEPS_C) $(BITINDEX_DEPS_C) $(CFLAGS) $(LIB) -o bitI
 
-pesQ: pes-querier-exp.cc treap.hh kvec.hh histogram.hh query.h pes-querier.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
-	$(CC) pes-querier-exp.cc $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o pesQ
+pesQ: pes-querier.cc treap.hh kvec.hh histogram.hh query.h pes-querier.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
+	$(CC) pes-querier.cc $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o pesQ
 
 bitQ: bit-querier.cc query.h $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix-ops.o
 	$(CC) bit-querier.cc $(BITINDEX_DEPS_C) $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(CFLAGS) $(LIB) -o bitQ

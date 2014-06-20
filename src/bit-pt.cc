@@ -7,7 +7,7 @@
 #include <cstring>
 #include "bit-index.hh"
 #include "profile_helper.h"
-#include "options.h"
+#include "constants.hh"
 #include "histogram.hh"
 
 using namespace std;

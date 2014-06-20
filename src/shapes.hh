@@ -1,19 +1,20 @@
 /*
- * All four shapes (points, vertial lines, horizontal lines, rectangles).
+ * Define the shapes.
+ * Only vertical line and rectangle are defined. 
+ * We represent point and horizontal line by vertical line and rectangle representatively to obtain better querying performance.
  * By richardxx, 2014.4
  */
 
 #ifndef SHAPE_H
 #define SHAPE_H
 
-#include <vector>
-using std::vector;
+#include "options.hh"
 
 const int SIG_POINT = 0;
 const int SIG_VERTICAL = 0x40000000;
 const int SIG_HORIZONTAL = 0x80000000;
 const int SIG_RECT = 0xc0000000;
-
+const int SIG_FIGURE = 0xc0000000;
 
 // Vertical Line
 // It represents both points and vertical lines
@@ -22,7 +23,15 @@ struct VLine
   int y1, y2;
 
   VLine() { }
-  VLine( const VLine& other ) {
+  
+  VLine( int y1, int y2 ) 
+  { 
+    this->y1 = y1; 
+    this->y2 = y2; 
+  }
+
+  VLine( const VLine& other ) 
+  {
     *this = other;
   }
 
@@ -33,6 +42,7 @@ struct VLine
     return *this;
   }
 
+#ifdef INDEX_UTILITY
   virtual int get_type() { return SIG_VERTICAL; }
 
   virtual int prepare_labels(int* labels)
@@ -41,11 +51,12 @@ struct VLine
       labels[0] = y1;
       return 1;
     }
-
+    
     labels[0] = y1 | SIG_VERTICAL;
     labels[1] = y2;
     return 2;
   }
+#endif
 };
 
 /*
@@ -79,6 +90,7 @@ struct Rectangle : public VLine
     return *this;
   }
 
+#ifdef INDEX_UTILITY
   int get_type() { return SIG_RECT; }
 
   // Virtual overloading
@@ -96,30 +108,7 @@ struct Rectangle : public VLine
     labels[2] = y2;
     return 3;
   }
-};
-
-#ifndef USE_OWN_FIGURE_SET
-// An structure used to collect the figures
-struct FigureSet
-{
-  vector<VLine*> *rects;
-
-  FigureSet()
-  {
-    rects = new vector<VLine*>;
-  }
-  
-  ~FigureSet()
-  {
-    delete rects;
-  }
-
-  void clear() 
-  {
-    rects->clear();
-  }
-};
-
 #endif
+};
 
 #endif

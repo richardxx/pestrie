@@ -1,6 +1,5 @@
 /*
  * This section defines the global options for both bitmap and PesTrie index.
- *
  * by richardxx, 2012.9
  */
 
@@ -41,7 +40,8 @@
 static const char* pt_matrix_info[] = { 
   "Points-to",
   "Alias",
-  "Pointed-to-by" };
+  "Pointed-to-by" 
+};
   
 #define N_OF_SE_INDEX  7
 #define N_OF_LOADABLE_SE_INDEX 4
@@ -60,9 +60,7 @@ static const char* se_matrix_info[] = {
   "Store-Load",
   "Load-Store",
   "Store-Trans",
-  "Load-Trans" };
-
-// Thresholds
-#define MAXIMUM_DECOMPOSE_BOUNDS   32
+  "Load-Trans" 
+};
 
 #endif

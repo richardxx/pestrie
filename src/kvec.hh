@@ -40,7 +40,7 @@
 
 /*
   2008-09-22 (0.1.0): The initial version.
-  2010-4-29  (0.2.0): Better support for C++, by richardxx 
+  2010-04-29 (0.2.0): Better support for C++, by richardxx 
 */
 
 #ifndef AC_KVEC_H

@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <cstdlib>
 #include "bit-index.hh"
-#include "options.h"
+#include "constants.hh"
 #include "profile_helper.h"
 
 static char* input_file = NULL;

@@ -8,7 +8,7 @@
 #include "matrix-ops.hh"
 #include "bit-index.hh"
 #include "profile_helper.h"
-#include "options.h"
+#include "constants.hh"
 
 using namespace std;
 

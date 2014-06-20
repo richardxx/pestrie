@@ -1,5 +1,5 @@
 /*
- * The segment tree tailored for the PesTrie algorithm.
+ * The segment tree based structure for storing figures.
  * By richardxx, 2010.6
  * Updated, 2012.9
  */
@@ -8,9 +8,6 @@
 #define SEGTREE_H
 
 #include "treap.hh"
-#include <cstdio>
-using std::FILE;
-
 
 struct SegTreeNode
 {
@@ -41,7 +38,7 @@ struct SegTree
   ~SegTree();
 };
 
-
+//
 SegTree* 
 build_segtree( int, int);
 

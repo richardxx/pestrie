@@ -1,9 +1,7 @@
 /*
  * The common procedures for manipulating PesTrie.
- * richardxx, 2012.9
+ * By richardxx, 2012.9
  */
-
-#define USE_OWN_FIGURE_SET
 
 #include <vector>
 #include <cmath>
@@ -18,63 +16,6 @@
 #include "matrix-ops.hh"
 
 using namespace std;
-
-// An internal structure used to collect the index figures
-struct FigureSet
-{
-  vector<Point*> *points;
-  vector<Rectangle*> *vertis;
-  vector<Rectangle*> *horizs;
-  vector<Rectangle*> *rects;
-
-  FigureSet()
-  {
-    points = new vector<Point*>;
-    vertis = new vector<Rectangle*>;
-    horizs = new vector<Rectangle*>;
-    rects = new vector<Rectangle*>;
-  }
-
-  ~FigureSet()
-  {
-    delete points;
-    delete vertis;
-    delete horizs;
-    delete rects;
-  }
-};
-
-
-static 
-void treap_collect_rects( TreapNode* p, void* par )
-{
-  struct FigureSet* figures = (struct FigureSet*)par;
-  Rectangle *rect = (Rectangle*)p->data;
-  
-  if ( rect->x1 == rect->x2 )
-    figures->vertis->push_back( rect );
-  else if ( rect->y1 == rect->y2 )
-    figures->horizs->push_back( rect );
-  else
-    figures->rects->push_back( rect );
-}
-
-static 
-void treap_collect_points( TreapNode* p, void* par )
-{
-  struct FigureSet* figures = (struct FigureSet*)par;
-  figures->points->push_back( p->data );
-}
-
-static 
-void seg_tree_visitor( SegTreeNode* pseg, void* par )
-{
-  // We directly call the treap traversal procedure
-  if ( pseg->rects != NULL )
-    visit_treap( pseg->rects, treap_collect_rects, par );
-  if ( pseg->points != NULL )
-    visit_treap( pseg->points, treap_collect_points, par );
-}
 
 
 /*
@@ -159,16 +100,6 @@ PesTrie::build_pestrie_core()
   // But not every root has a non-empty subtree
   int vertex_num = cm;
   for ( k = 0; k < cm; ++k ) {
-    /*
-    if ( k == 5715 || k == 17686 || k == 5736 || k == 10130 ) {
-      fprintf( stderr, "object %d ( permute id = %d), size = %d\n", Vsrc[k], k, 
-	       bitmap_count_bits(mat_T[ Vsrc[k] ]) );
-      EXECUTE_IF_SET_IN_BITMAP(mat_T[ Vsrc[k] ],0,x,bi) {
-	fprintf( stderr, "%d  ", x );
-      }
-      fprintf( stderr, "\n" );
-    }
-    */
    
     i = r_order[k].id;
     // We use this lower-bound to distinguish the phase
@@ -282,26 +213,11 @@ void PesTrie::profile_index()
   int m = this->m;
   int vn = this->vn;
 
-  /*
-    int n_points = this->seg_tree->n_points;
-    int n_vertis = this->seg_tree->n_vertis;
-    int n_horizs = this->seg_tree->n_horizs;
-    int n_rects = this->seg_tree->n_rects;
-    
-    assert( n_rects == this->seg_tree->n_rects );
-    assert( n_vertis == this->seg_tree->n_vertis );
-    assert( n_horizs == this->seg_tree->n_horizs );
-    assert( n_points == this->seg_tree->n_points );
-  */
-
-  FigureSet *figures = new FigureSet;
-  visit_segTree( this->seg_tree, seg_tree_visitor, figures );
-  int n_rects = figures->rects->size();
-  int n_vertis = figures->vertis->size();
-  int n_horizs = figures->horizs->size();
-  int n_points = figures->points->size();
+  int n_points = seg_tree->n_points;
+  int n_vertis = seg_tree->n_vertis;
+  int n_horizs = seg_tree->n_horizs;
+  int n_rects = seg_tree->n_rects;
   int n_total_stored = n_points + n_vertis + n_horizs + n_rects;
-  int n_gen_rects = this->n_gen_rects;
 
   fprintf( stderr, "We totally generate %d rectangles, %d of them are indexed.\n", 
 	   n_gen_rects, n_total_stored );
@@ -321,44 +237,19 @@ void PesTrie::profile_index()
   //fprintf( stderr, "nlgn roughly equals to : %.0lf\n", n * log(n) );
   
   fprintf( stderr, "Rectangle pairs : %d, on average %.3lf alias pairs per rectangle\n", 
-	   this->seg_tree->n_pairs, 
-	   (double)(this->seg_tree->n_pairs)/(n_total_stored) );
+	   seg_tree->n_pairs, 
+	   (double)(seg_tree->n_pairs)/(n_total_stored) );
 
-  // Estimate the index size (almost real)
-  double intsize = sizeof(int);
-  int labels = 0;
-
-  // We precisely evaluate the storage size for points
-  for ( int i = figures->points->size() - 1; i > -1; ) {    
-    Point *p = figures->points->at(i);
-    int X = p->x1;
-    int j = i - 1;
-
-    while ( j > -1 ) {
-      p = figures->points->at(j);
-      if ( p->x1 != X ) break;
-      --j;
-    }
-
-    labels += 2 + i - j;
-    i = j;
-  }
-  
-  labels += 6 + n + m + n_rects * 4 + (n_vertis + n_horizs) * 3;
-  fprintf( stderr, "Index labels : %d\n", labels );
-  fprintf( stderr, "The PesTrie index size is : %.0lfKb\n", labels * intsize / 1024 );
-
-  delete figures;
   show_res_use( NULL );
 }
 
 void 
-PesTrie::profile_additional()
+PesTrie::advanced_profile_index()
 {
   if ( this->pes_opts->profile_in_detail == false )
     return;
   
-  fprintf( stderr, "\n--------------Additional Information--------------\n" );
+  fprintf( stderr, "\n--------------Additional Information for Index--------------\n" );
 
   int n = this->n;
   int m = this->m;
@@ -369,53 +260,6 @@ PesTrie::profile_additional()
   int *es_size = this->es_size;
   bitmap* mat_T = this->mat_T;
   int *r_count = this->r_count;
-  int *alias_count = this->alias_count;
-
-
-  // object induced alias frequency + tree size
-  if ( 0 && this->index_type == PT_MATRIX ) {
-    histogram obj_freq;
-    long freq_scales[] = { 10, 100, 1000, 5000 };
-    obj_freq.push_scales( freq_scales, 4 );
-
-    histogram tr_sizes;
-    long size_scales[] = { 5, 50, 100, 200 };
-    tr_sizes.push_scales( size_scales, 4 );
-
-    // We first collect the #of internal pairs
-    int *tr_sz = new int[cm];
-    memset( tr_sz, 0, sizeof(int) * cm );
-    
-    for ( int i = cm; i < vn; ++i ) {
-      int tr_code = pes[i];
-      tr_sz[tr_code]++;
-    }
-    
-    long tot_internals = 0;
-    long tot_pairs = 0;
-
-    for ( int i = 0; i < cm; ++i ) {
-      int sz = tr_sz[i] + 1;
-      
-      int n_internal = sz * (sz-1) / 2;
-      tot_internals += sz;
-      alias_count[i] += n_internal; 
-      tot_pairs += alias_count[i];
-
-      obj_freq.add_sample( alias_count[i] );
-      tr_sizes.add_sample( n_internal );
-    }
-  
-    delete[] tr_sz;
-
-    fprintf( stderr, "Internal pairs = %lld, All pairs = %lld, percent = %.2lf\n",
-	     tot_internals, tot_pairs, (double)tot_internals/tot_pairs );
-
-    obj_freq.print_result( stderr, "Alias Groups Sizes", false );
-    obj_freq.print_weights( stderr, "Alias Groups Weighted Sizes", false );
-    tr_sizes.print_result( stderr, "Internal Pairs", false );
-  }
-
 
   // We profile the objects (pointed-to sizes + hub degrees)
   if ( 1 ) {
@@ -489,36 +333,21 @@ PesTrie::profile_additional()
     pted_sizes.print_result( stderr, "Pointed-to-by Matrix", false );
   }
       
-  // We profile the percentage of alias pairs introduced by first k% trees
-  if ( 0 ) {
-    histogram pt_seen;
-    long percents[] = { cm/1000, cm/100, cm/50, cm/10, cm/5 };
-    pt_seen.push_scales( percents, 5 );
-    
-    for ( int i = 0; i < cm; ++i ) {
-      pt_seen.add_sample( i, alias_count[i] );
-    }
-    
-    pt_seen.print_weights( stderr, "Alias pairs introduced by the first K trees.." );
-  }
-
   // We profile the cross edges (#cross edges for each subtree)
-  if ( 1 ) {
-    int tot_cross_edges = 0;
-    histogram cross_edge_size;
-    long cross_scales[] = {1, 3, 17, 67};
-    cross_edge_size.push_scales( cross_scales, 4 );
-    
-    for ( int i = 0; i < cm; ++i ) {
-      int sz = this->cross_edges[i].size();
-      cross_edge_size.add_sample( sz );
+  int tot_cross_edges = 0;
+  histogram cross_edge_size;
+  long cross_scales[] = {1, 3, 17, 67};
+  cross_edge_size.push_scales( cross_scales, 4 );
+  
+  for ( int i = 0; i < cm; ++i ) {
+    int sz = this->cross_edges[i].size();
+    cross_edge_size.add_sample( sz );
       tot_cross_edges += sz;
-    }
-    
-    fprintf( stderr, "Total cross edges = %d\n", tot_cross_edges );
-    cross_edge_size.print_result( stderr, "PesTrie Cross Edge Distribution", false );
   }
-
+  
+  fprintf( stderr, "Total cross edges = %d\n", tot_cross_edges );
+  cross_edge_size.print_result( stderr, "PesTrie Cross Edge Distribution", false );
+  
   // Output
   //tree_size.print_result( stderr, "PesTrie Tree Size Distribution", false );
   show_res_use( NULL );
@@ -529,18 +358,17 @@ PesTrie::profile_additional()
  * The index file is in binary form and the format is shown below:
  * 
  * Magic Number (4 bytes)
- * N_p(pointer) N_o(object) N_vn (ES) N_r(rectangles) N_v(verticals) N_h(horizontals) N_p(points)
+ * N_p(pointer) N_o(object) N_vn(ES) N_f(#figures)
  * preV labels (N_p+N_o)
- * R
- * V
- * H
- * P
+ * (Followed is a matrix of the figures)
+ * n_bytes1, all the rectangles and points
+ * n_bytes2, ....
+ * .....
+ * n_bytesk
  */
 void 
 PesTrie::externalize_index( FILE* fp, const char* magic_number)
 {
-  int i, j, k;
-    
   int n = this->n;
   int m = this->m;
   int cm = this->cm;
@@ -549,12 +377,13 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   int *m_rep = this->m_rep;
   int *preV = this->preV;
   int *bl = this->bl;
+  SegTree* seg_tree = this->seg_tree;
 
   // Fill up the preV mapping for input pointers and objects
   int *pre_aux = new int[n+m];
  
   // First are the pointers
-  for ( i = 0; i < n; ++i ) {
+  for ( int i = 0; i < n; ++i ) {
     int x = bl[i];
     // a pointer may not have a timestamp
     pre_aux[i] = ( x == -1 ? -1: preV[x] );
@@ -562,33 +391,26 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
 
   // Second are the objects
   int *obj_pos = new int[cm];
-  for ( i = 0; i < cm; ++i ) {
-    j = r_order[i].id;
+  for ( int i = 0; i < cm; ++i ) {
+    int j = r_order[i].id;
     obj_pos[j] = i;
   }
 
-  for ( i = 0; i < m; ++i ) {
+  for ( int i = 0; i < m; ++i ) {
     // i'th object is aggregated into the j'th group (pes node)
-    j = ( m_rep == NULL ? i : m_rep[i] );
+    int j = ( m_rep == NULL ? i : m_rep[i] );
     // The sorted id of group j
-    k = ( j == -1 ? -1 : obj_pos[j] );
+    int k = ( j == -1 ? -1 : obj_pos[j] );
     // set the timestamp of object i
     pre_aux[i+n] = ( k == -1 ? -1 : preV[k] );   
   }
   
-  // Next, we collect the figures
-  FigureSet *figures = new FigureSet;
-  visit_segTree( this->seg_tree, seg_tree_visitor, figures );
-  int n_rects = figures->rects->size();
-  int n_vertis = figures->vertis->size();
-  int n_horizs = figures->horizs->size();
-  int n_points = figures->points->size();
-  /*
-  assert( figures->rects->size() == this->seg_tree->n_rects );
-  assert( figures->vertis->size() == this->seg_tree->n_vertis );
-  assert( figures->horizs->size() == this->seg_tree->n_horizs );
-  assert( figures->points->size() == this->seg_tree->n_points );
-  */
+  // We first output the quantity of the figures
+  int n_points = seg_tree->n_points;
+  int n_vertis = seg_tree->n_vertis;
+  int n_horizs = seg_tree->n_horizs;
+  int n_rects = seg_tree->n_rects;
+  int n_figures = n_points + n_vertis + n_horizs + n_rects;
 
   // Now we start to output the index
   // Write the magic number
@@ -600,77 +422,23 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   fwrite( &m, sizeof(int), 1, fp );
   // Write N_vn
   fwrite( &vn, sizeof(int), 1, fp );
-  // Write N_r
-  fwrite( &(n_rects), sizeof(int), 1, fp );
-  // Write N_v
-  fwrite( &(n_vertis), sizeof(int), 1, fp );
-  // Write N_h
-  fwrite( &(n_horizs), sizeof(int), 1, fp );
-  // Write N_p
-  fwrite( &(n_points), sizeof(int), 1, fp );
+  // write N_f
+  fwrite( &n_figures, sizeof(int), 1, fp );
   // Write the preV mappings for pointers+objects
   fwrite( pre_aux, sizeof(int), n + m, fp );
 
-  // Write the index figures
-  int labels[] = { 0, 0, 0, 0 };
+  // Write the figures
+  flush_left_shapes( seg_tree );
+  int n_labels = dump_figures( seg_tree, fp );
 
-  for ( i = 0; i < n_rects; ++i ) {
-    Rectangle *p = figures->rects->at(i);
-    labels[0] = p->x1; labels[1] = p->y1; labels[2] = p->x2; labels[3] = p->y2; 
-    fwrite( labels, sizeof(int), 4, fp );
-    //printf( "%d %d %d %d\n", p->x1, p->x2, p->y1, p->y2 );
-  }
+  // Estimate the index size (almost real)
+  double intsize = sizeof(int);
+  n_labels += 3 + n + m;
+  fprintf( stderr, "Index labels : %d\n", n_labels );
+  fprintf( stderr, "The PesTrie index size is : %.0lfKb\n", n_labels * intsize / 1024 );
 
-  for ( i = 0; i < n_vertis; ++i ) {
-    Rectangle *p = figures->vertis->at(i);
-    // We store the values y1, x2, y2
-    labels[1] = p->y1; labels[2] = p->x2; labels[3] = p->y2; 
-    fwrite( labels + 1, sizeof(int), 3, fp );
-    //printf( "%d %d %d %d\n", p->x1, p->x2, p->y1, p->y2 );
-  }
-
-  for ( i = 0; i < n_horizs; ++i ) {
-    Rectangle *p = figures->horizs->at(i);
-    // We store the values x1, y1, x2
-    labels[0] = p->x1; labels[1] = p->y1; labels[2] = p->x2;
-    fwrite( labels, sizeof(int), 3, fp );
-    //printf( "%d %d %d %d\n", p->x1, p->x2, p->y1, p->y2 );
-  }
-
-  /*
-   * We perform a special treatment to points because they are the mass portion of the index.
-   * The format for consecutive points are:
-   * X n Y1 Y2 Y3 ... Yn
-   * The first is the X-coordinate shared by all the following n points.
-   */
-  for ( i = n_points -1; i > -1; ) {
-    Point *p = figures->points->at(i);
-    int X = p->x1;
-    j = i - 1;
-
-    while ( j > -1 ) {
-      p = figures->points->at(j);
-      if ( p->x1 != X ) break;
-      --j;
-    }
-
-    // The shared X
-    labels[0] = X;
-    // #points that share X
-    labels[1] = i - j;
-    fwrite( labels, sizeof(int), 2, fp );
-
-    for ( ; i > j; --i ) {
-      p = figures->points->at(i);
-      int Y = p->y1;
-      fwrite( &Y, sizeof(int), 1, fp );
-      //printf( "%d %d %d %d\n", X, X, p->y1, p->y1 );
-    }
-  }
-
-  delete pre_aux;
-  delete obj_pos;
-  delete figures;
+  delete[] pre_aux;
+  delete[] obj_pos;
 }
 
 
@@ -705,5 +473,5 @@ build_index_with_pestrie( PesTrie* pestrie )
   // Output the statistics of PesTrie index
   pestrie->profile_pestrie();  
   pestrie->profile_index();
-  pestrie->profile_additional();
+  pestrie->advanced_profile_index();
 }

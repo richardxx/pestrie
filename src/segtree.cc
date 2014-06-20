@@ -9,8 +9,26 @@
 
 using namespace std;
 
-static int my_count = 0;
-static FILE* test_file = NULL;
+// An structure used to collect the figures
+struct FigureSet
+{
+  VECTOR(VLine*) *rects;
+
+  FigureSet()
+  {
+    rects = new vector<VLine*>;
+  }
+  
+  ~FigureSet()
+  {
+    delete rects;
+  }
+
+  void clear() 
+  {
+    rects->clear();
+  }
+};
 
 
 // Insert this rectangle into the index
@@ -86,9 +104,7 @@ SegTree::~SegTree()
 struct SegTree* 
 build_segtree( int s, int e )
 {
-  SegTree* seg_tree = new SegTree(e);
-  //test_file = fopen( "rects.txt", "w" );
- 
+  SegTree* seg_tree = new SegTree(e); 
   return seg_tree;
 }
 
@@ -160,10 +176,9 @@ insert_segtree_wrapper( SegTree* seg_tree, const Rectangle& r )
 
   insert_rectangle( seg_tree, r.x1, r.x2, p);
   seg_tree->n_pairs += (r.x2-r.x1+1) * (r.y2-r.y1+1);
-  //fprintf( test_file, "(%d, %d, %d, %d)\n", r.x1, r.x2, r.y1, r.y2 );
 }
 
-// A universal traversal procedure for customized tree visit
+// Traverse and write the figures into a binary format file
 int
 dump_figures( SegTree *seg_tree, FILE* fp )
 {
