@@ -5,7 +5,7 @@
  * Improved 2012.7: improve the alias query to O(lgn) practical performance.
  * Improved 2012.10: fix bugs and code refactoring.
  * Improved 2014.02: fix bugs and improve performance.
- * Improved 2015.05: significantly improve the decoding performance and querying memory usage
+ * Improved 2014.05: significantly improve the decoding performance and querying memory usage
  */
 
 #include <cstdio>
