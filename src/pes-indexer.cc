@@ -24,6 +24,7 @@ static const char* magic_numbers[] = { PESTRIE_PT_1, PESTRIE_SE_1 };
 static void
 print_help(const char* prog_name)
 {
+  printf( "Pestrie version %s\n", PES_VERSION );
   printf( "Usage : %s [options] input_file [output_file]\n", prog_name );
   printf( "Options  : \n" );
   printf( "-d       : Draw Pes-Trie in graphviz (default = false).\n" );

@@ -11,34 +11,48 @@
 #include <cstring>
 #include <vector>
 #include <set>
-#include "constants.hh"
+#include "query.hh"
 #include "profile_helper.h"
 #include "matrix-ops.hh"
 #include "kvec.hh"
-#include "query.h"
 #include "bit-index.hh"
 
 using namespace std;
 
-struct BitQS
+class BitQS : public IQuery
 {
-  Cmatrix **qmats;
-  int n_of_mat;
-  int n, m;
-  int n_ld, n_st;       // #of load, #of store
-  int n_es;             // #of ES of pointers
+public:
+  // Interface functions
+  bool IsAlias( int x, int y);
+  int ListPointsTo( int x, const IFilter* filter );
+  int ListAliases( int x, const IFilter* filter );
+  int ListPointedBy( int o, const IFilter* filter );
+  int ListModRefVars( int x, const IFilter* filter );
+  int ListConflicts( int x, const IFilter* filter );
 
-  // An one-level index to navigate the search the locations of compressed pointers/object
-  int *pt_map, *obj_map;
-
-  BitQS()
+public:
+  BitQS(int n_ptrs, int n_objs, int type)
   {
-    qmats = NULL;
     n_of_mat = 0;
-    n = m = 0;
     n_ld = n_st = 0;
     n_es = 0;
     pt_map = obj_map = NULL;
+    
+    n = n_ptrs; m = n_objs;
+    index_type = type;
+
+    if ( type == PT_MATRIX ) {
+      n_of_mat = N_OF_PT_INDEX;
+      obj_map = new int[n_objs];
+      es2objs = new VECTOR(int)[n_objs];
+    }
+    else {
+      n_of_mat = N_OF_SE_INDEX;
+    }
+    
+    qmats = new Cmatrix*[n_of_mat];
+    es2ptrs = new VECTOR(int)[n_ptrs];
+    pt_map = new int[n_ptrs];
   }
 
   ~BitQS()
@@ -52,41 +66,44 @@ struct BitQS
     
     if ( pt_map != NULL ) delete[] pt_map;
     if ( obj_map != NULL ) delete[] obj_map;
+    if ( es2ptrs != NULL ) delete[] es2ptrs;
+    if ( es2objs != NULL ) delete[] es2objs;
   }
+
+public:
+  // Input matrices
+  Cmatrix **qmats;
+  int n_of_mat;
+
+  int n, m;             // #pointers, #objects
+  int n_ld, n_st;       // #loads, #stores
+  int n_es;             // #pointer equivalent sets
+
+  // An one-level index to navigate the search the locations of compressed pointers/object
+  int *pt_map, *obj_map;
+  int index_type;
+
+  // Members for each pointer (object) representative
+  VECTOR(int) *es2ptrs = NULL;
+  VECTOR(int) *es2objs = NULL;
 };
 
-
-static int index_type;
-static int cnt_same_es = 0;
-
-// Members for each pointer (object) representative
-static kvec_t(int) *es2pointers = NULL;
-static kvec_t(int) *es2objs = NULL;
-
+//static int cnt_same_es = 0;
 
 static BitQS*
 load_pt_index( FILE *fp )
 {
-  // load header info
+  // Load header info
   int n, m;
   fread( &n, sizeof(int), 1, fp );
   fread( &m, sizeof(int), 1, fp );
-
-  int *pt_map = new int[n];
-  int *obj_map = new int[m];
-  fread( pt_map, sizeof(int), n, fp );
-  fread( obj_map, sizeof(int), m, fp );
   
-  // create
-  BitQS *bitqs = new BitQS;
-  bitqs->qmats = new Cmatrix*[N_OF_PT_INDEX];
-  bitqs->n_of_mat = N_OF_PT_INDEX;
-  bitqs->n = n;
-  bitqs->m = m;
-  bitqs->pt_map = pt_map;
-  bitqs->obj_map = obj_map;
+  // Load mapping info
+  BitQS *bitqs = new BitQS(n, m, PT_MATRIX);
+  fread( bitqs->pt_map, sizeof(int), n, fp );
+  fread( bitqs->obj_map, sizeof(int), m, fp );
 
-  // load the index
+  // Load the index
   int i = 0;
   while ( i < N_OF_LOADABLE_PT_INDEX ) {
     int m_type, dim_r, dim_c;
@@ -98,7 +115,7 @@ load_pt_index( FILE *fp )
     
     Cmatrix *cm = new Cmatrix( dim_r, dim_c, true, false );
     bitmap *mat = cm->mat;
-    bool skip = (slow_mode && m_type > I_PT_MATRIX);
+    bool skip = (trad_mode && m_type > I_PT_MATRIX);
     for ( int k = 0; k < dim_r; ++k )
       mat[k] = bitmap_read_row( fp, COMPRESSED_FORMAT, skip );
     
@@ -106,9 +123,9 @@ load_pt_index( FILE *fp )
     bitqs->qmats[i++] = cm;
   }
  
-  // We compute the pointed-to-by matrix
+  // Compute the pointed-by matrix
   bitqs->qmats[I_PTED_MATRIX] = transpose( bitqs->qmats[I_PT_MATRIX] );
- 
+
   return bitqs;
 }
 
@@ -117,34 +134,27 @@ load_se_index( FILE *fp )
 {
   int i;
 
-  // load header info
+  // Load header info
   int n, m;
   fread( &n, sizeof(int), 1, fp );
   fread( &m, sizeof(int), 1, fp );
 
-  // load the mapping information
+  // Load mapping info
+  BitQS *bitqs = new BitQS(n, m, SE_MATRIX);
   int *pt_map = new int[n];
   fread( pt_map, sizeof(int), n, fp );  
 
+  // Profile the mapping information
   int n_ld = 0, n_st = 0;
   for ( i = 0; i < n; ++i ) {
     if ( pt_map[i] >= n ) ++n_ld;
     else ++n_st;
   }
-  
-  // create
-  BitQS *bitqs = new BitQS;
-  Cmatrix **qmats = new Cmatrix*[N_OF_SE_INDEX];
-  bitqs->qmats = qmats;
-  bitqs->n_of_mat = N_OF_SE_INDEX;
-  bitqs->n = n;
-  bitqs->m = m;
+
   bitqs->n_st = n_st;
   bitqs->n_ld = n_ld;
-  bitqs->pt_map = pt_map;
 
-  // load the index
-  // We set the dimensions of the matrices
+  // Load the index
   i = 0;
   while ( i < N_OF_LOADABLE_SE_INDEX ) {
     int m_type, dim_r, dim_c;
@@ -156,49 +166,27 @@ load_se_index( FILE *fp )
     
     Cmatrix *cm = new Cmatrix( dim_r, dim_c, true, false );
     bitmap *mat = cm->mat;
-    bool skip = (slow_mode && m_type > I_LOAD_MATRIX);
+    bool skip = (trad_mode && m_type > I_LOAD_MATRIX);
     for ( int k = 0; k < dim_r; ++k )
       mat[k] = bitmap_read_row( fp, COMPRESSED_FORMAT, skip );
 
     profile_matrix( cm, se_matrix_info[i], stderr );
-    qmats[i] = cm;
+    bitqs->qmats[i] = cm;
     ++i;
   }
   
-  // The transposed store and load matrix
-  qmats[I_STORE_TRANS_MATRIX] = transpose( qmats[I_STORE_MATRIX] );
-  qmats[I_LOAD_TRANS_MATRIX] = transpose( qmats[I_LOAD_MATRIX] );
-  qmats[I_LD_ST_MATRIX] = transpose( qmats[I_ST_LD_MATRIX] );
+  // Compute the transposed store and load matrix
+  bitqs->qmats[I_STORE_TRANS_MATRIX] = transpose( bitqs->qmats[I_STORE_MATRIX] );
+  bitqs->qmats[I_LOAD_TRANS_MATRIX] = transpose( bitqs->qmats[I_LOAD_MATRIX] );
+  bitqs->qmats[I_LD_ST_MATRIX] = transpose( bitqs->qmats[I_ST_LD_MATRIX] );
 
   return bitqs;
 }
 
 BitQS*
-load_index()
+load_bitmap_index( FILE* fp, int index_type )
 {
   __init_matrix_lib();
-
-  FILE *fp = fopen( input_file, "rb" );
-  if ( fp == NULL ) return NULL;
-
-  // We first validate the index file
-  char magic_code[7];
-  fread( magic_code, sizeof(char), 4, fp );
-  magic_code[4] = 0;
-  
-  index_type = UNDEFINED_MATRIX;
-
-  if ( strcmp( magic_code, BITMAP_PT_1 ) == 0)
-    index_type = PT_MATRIX;
-  else if ( strcmp( magic_code, BITMAP_SE_1 ) == 0 )
-    index_type = SE_MATRIX;
-  
-  if ( index_type == UNDEFINED_MATRIX ) {
-    fprintf( stderr, "This is an INVALID bitmap index file.\n" );
-    return false;
-  }
-
-  // Load
   fprintf( stderr, "\n-------Input: %s-------\n", input_file );
 
   BitQS *bitqs = NULL;
@@ -207,17 +195,14 @@ load_index()
   else
     bitqs = load_se_index( fp );
 
-
   // Now we create the group -> pointers mapping
   // The statements in side-effect analysis are treated specially
   int n = bitqs->n;
   int m = bitqs->m;
   int n_st = bitqs->n_st;
   int n_ld = bitqs->n_ld;
-  int *pt_map = bitqs->pt_map;
   int n_es = -1;
-  
-  es2pointers = new kvec_t(int)[n];
+
   for ( int i = 0; i < n; ++i ) {
     int es = pt_map[i];
     if ( es == -1 ) continue;
@@ -226,55 +211,66 @@ load_index()
       // A load statement
       // We reallocate its position to make the mapping compact
       es = es - n + n_st;
-      pt_map[i] = es;
+      bitqs->pt_map[i] = es;
     }
 
     if ( es > n_es ) n_es = es;
-    es2pointers[es].push_back(i);
+    bitqs->es2ptrs[es].push_back(i);
   }
 
   if ( index_type == PT_MATRIX ) {
-    // Particular for points-to matrix
-    int *obj_map = bitqs->obj_map;
-    es2objs = new kvec_t(int)[m];
-
+    // Decompress the equivalent objects
     for ( int i = 0; i < m; ++i ) {
-      int es = obj_map[i];
+      int es = bitqs->obj_map[i];
       if ( es != -1 )
-	es2objs[es].push_back(i);
+	bitqs->es2objs[es].push_back(i);
     }
   }
 
   // We set the number of equivalent pointer sets to be the largest es ID + 1
   bitqs->n_es = n_es + 1;
-
+  
   show_res_use( "Index loading" );
   return bitqs;
 }
 
+static int
+iterate_equivalent_set( VECTOR(int) *es_set, const IFilter* filter )
+{
+  int ans = 0;
+  int size = es_set->size();
+  
+  for ( int i = 0; i < size; ++i ) {
+    int q = es_set->at(i);
+    if ( filter->validate(q) )
+      ans++;
+  }
+  
+  return ans;
+}
 
 bool 
-IsAlias( BitQS* bitqs, int x, int y )
+BitQS::IsAlias( int x, int y )
 {
-  x = bitqs->pt_map[x];
+  x = pt_map[x];
   if ( x == -1 ) return false;
-  y = bitqs->pt_map[y];
+  y = pt_map[y];
   if ( y == -1 ) return false;
 
   if ( x == y ) {
-    ++cnt_same_es;
+    //++cnt_same_es;
     return true;
   }
 
   int ret = 0;
 
-  if ( slow_mode == true ) {
-    Cmatrix* ptm = bitqs->qmats[I_PT_MATRIX];
+  if ( trad_mode == true ) {
+    Cmatrix* ptm = qmats[I_PT_MATRIX];
     ret = bitmap_same_bit_p( ptm->at(x), ptm->at(y) );
   }
   else {
     // We lookup the result in alias matrix
-    Cmatrix *am = bitqs->qmats[I_ALIAS_MATRIX];
+    Cmatrix *am = qmats[I_ALIAS_MATRIX];
     bitmap amx = am->at(x);
     ret = bitmap_bit_p( amx, y );
   }
@@ -282,44 +278,19 @@ IsAlias( BitQS* bitqs, int x, int y )
   return ret != 0;
 }
 
-static int
-iterate_equivalent_set( kvec_t(int) *es_set )
-{
-  int ans = 0;
-  int size = es_set->size();
-
-  for ( int i = 0; i < size; ++i ) {
-    int q = es_set->at(i);
-    if ( q > 0 )
-      ans++;
-  }
-
-  return ans;
-}
-
-bool 
-IsPointsTo( BitQS *bitqs, int x, int o )
-{
-  x = bitqs->pt_map[x];
-  if ( x == -1 ) return false;
-  o = bitqs->pt_map[o];
-  Cmatrix *cm = bitqs->qmats[I_PT_MATRIX];
-  return bitmap_bit_p( cm->at(x), o );
-}
-
 int 
-ListPointsTo( BitQS *bitqs, int x )
+BitQS::ListPointsTo( int x )
 {
   int ans = 0;
   unsigned o;
   bitmap_iterator bi;
 
-  x = bitqs->pt_map[x];
+  x = pt_map[x];
 
   if ( x != -1 ) {
-    bitmap ptx = bitqs->qmats[I_PT_MATRIX]->at(x);
+    bitmap ptx = qmats[I_PT_MATRIX]->at(x);
     EXECUTE_IF_SET_IN_BITMAP( ptx, 0, o, bi ) {
-      kvec_t(int) *objs = &es2objs[o];
+      VECTOR(int) *objs = &es2objs[o];
       ans += iterate_equivalent_set( objs );
     }
   }
@@ -328,18 +299,19 @@ ListPointsTo( BitQS *bitqs, int x )
 }
 
 int 
-ListPointedTo( BitQS *bitqs, int o )
+BitQS::ListPointedTo( int o, const IFilter* filter )
 {
   int ans = 0;
   unsigned p;
   bitmap_iterator bi;
+  
+  o = obj_map[o];
 
-  o = bitqs->obj_map[o];
   if ( o != -1 ) {
-    bitmap pto = bitqs->qmats[I_PTED_MATRIX]->at(o);
+    bitmap pto = qmats[I_PTED_MATRIX]->at(o);
     EXECUTE_IF_SET_IN_BITMAP( pto, 0, p, bi ) {
-      kvec_t(int) *ptrs = &es2pointers[p];
-      ans += iterate_equivalent_set( ptrs );
+      VECTOR(int) *ptrs = &es2pointers[p];
+      ans += iterate_equivalent_set( ptrs, filter );
     }
   }
 
@@ -347,7 +319,7 @@ ListPointedTo( BitQS *bitqs, int o )
 }
 
 int 
-ListAliases_by_representatives( BitQS *bitqs, int x, kvec_t(int) *es2baseptrs )
+BitQS::ListAliases( int x, const IFilter* filter )
 {
   int ans = 0;
   unsigned q, o;
@@ -355,42 +327,39 @@ ListAliases_by_representatives( BitQS *bitqs, int x, kvec_t(int) *es2baseptrs )
   bitmap res;
 
   // Translate base pointer to its rerepsentative
-  x = bitqs->pt_map[x];
+  x = pt_map[x];
 
   // Continue if x has points-to information
   if ( x != -1 ) {
-    Cmatrix **qmats = bitqs->qmats;
+    Cmatrix **qmats = qmats;
     res = qmats[I_ALIAS_MATRIX]->at(x);
-
+    
     // We compute the result immediately
-    // if ( res == NULL ) {
-    //   Cmatrix *ptm = qmats[I_PT_MATRIX];
-    //   bitmap ptx = ptm->at(x);
-    //   res = BITMAP_ALLOC(NULL);
+    if ( res == NULL ) {
+      Cmatrix *ptm = qmats[I_PT_MATRIX];
+      bitmap ptx = ptm->at(x);
+      res = BITMAP_ALLOC(NULL);
       
-    //   Cmatrix *ptedm = qmats[I_PTED_MATRIX];
-    //   EXECUTE_IF_SET_IN_BITMAP( ptx, 0, o, bi ) {
-    // 	bitmap_ior_into( res, ptedm->at(o) );
-    //   }
+      Cmatrix *ptedm = qmats[I_PTED_MATRIX];
+      EXECUTE_IF_SET_IN_BITMAP( ptx, 0, o, bi ) {
+    	bitmap_ior_into( res, ptedm->at(o) );
+      }
       
-    //   qmats[I_ALIAS_MATRIX]->set(x, res);
-    // }
+      qmats[I_ALIAS_MATRIX]->set(x, res);
+    }
     
     // Extract the base pointers as the answer
     EXECUTE_IF_SET_IN_BITMAP( res, 0, q, bi ) {
-      kvec_t(int) *ptrs = ( es2baseptrs == NULL ? &es2pointers[q] : &es2baseptrs[q] );
-      ans += iterate_equivalent_set( ptrs );
+      VECTOR(int) *ptrs = &es2pointers[q];
+      ans += iterate_equivalent_set( ptrs, filter );
     }
-
-    // if ( slow_mode == true )
-    //   BITMAP_FREE(res);
   }
   
   return ans;
 }
-
+/*
 int
-ListAliases_by_pointers( BitQS *bitqs, int i, kvec_t(int) &pointers )
+ListAliases_by_pointers( BitQS *bitqs, int i, VECTOR(int) &pointers )
 {
   int ans = 0;
   unsigned q;
@@ -434,24 +403,24 @@ ListAliases_by_pointers( BitQS *bitqs, int i, kvec_t(int) &pointers )
   
   return ans;
 }
+*/
 
-
-static int 
-ListModRefVars( BitQS *bitqs, int x )
+int 
+BitQS::ListModRefVars( int x, const IFilter* filter )
 {
   int ans = 0;
   unsigned o;
   bitmap_iterator bi;
 
-  x = bitqs->pt_map[x];
+  x = pt_map[x];
 
   if ( x != -1 ) {
-    bool is_load = ( x >= bitqs->n_st );
-    if ( is_load ) x = x - bitqs->n_st;
-    Cmatrix *mat = bitqs->qmats[is_load ? I_LOAD_MATRIX : I_STORE_MATRIX];
+    bool is_load = ( x >= n_st );
+    if ( is_load ) x = x - n_st;
+    Cmatrix *mat = qmats[is_load ? I_LOAD_MATRIX : I_STORE_MATRIX];
     bitmap accx = mat->at(x);
     EXECUTE_IF_SET_IN_BITMAP( accx, 0, o, bi ) {
-      if ( o >= 0 )
+      if ( filter->validate(o) )
 	++ans;
     }
   }
@@ -459,8 +428,8 @@ ListModRefVars( BitQS *bitqs, int x )
   return ans;
 }
 
-static int
-ListLoads( BitQS *bitqs, int x )
+int
+BitQS::ListLoads( int x, const IFilter* filter )
 {
   int ans = 0;
   unsigned v;
@@ -468,7 +437,6 @@ ListLoads( BitQS *bitqs, int x )
   bitmap res_other = NULL;
   
   // load-store or store-load conflicts
-  Cmatrix **qmats = bitqs->qmats;
   res_other = qmats[I_LD_ST_MATRIX]->at(x);
 
   // Compute and cache it on demand
@@ -486,23 +454,21 @@ ListLoads( BitQS *bitqs, int x )
   }
 
   // visit
-  int n_st = bitqs->n_st;
   EXECUTE_IF_SET_IN_BITMAP( res_other, 0, v, bi ) {
-    kvec_t(int) *stores = &es2pointers[v];
-    ans += iterate_equivalent_set( stores );
+    VECTOR(int) *stores = &es2pointers[v];
+    ans += iterate_equivalent_set( stores, filter );
   }
   
   return ans;
 }
 
-static int
-ListStores( BitQS *bitqs, int x )
+int
+BitQS::ListStores( int x, const IFilter* filter )
 {
   int ans = 0;
   unsigned v;
   bitmap_iterator bi;
   bitmap res_other = NULL, res_self = NULL;
-  Cmatrix **qmats = bitqs->qmats;
   bitmap ptx = qmats[I_STORE_MATRIX]->at(x);
   
   // Store-load conflicts
@@ -519,10 +485,9 @@ ListStores( BitQS *bitqs, int x )
     qmats[I_ST_LD_MATRIX]->set(x, res_other);
   }
   
-  int n_st = bitqs->n_st;
   EXECUTE_IF_SET_IN_BITMAP( res_other, 0, v, bi ) {
-    kvec_t(int) *stmts = &es2pointers[v+n_st];
-    ans += iterate_equivalent_set( stmts );
+    VECTOR(int) *stmts = &es2pointers[v+n_st];
+    ans += iterate_equivalent_set( stmts, filter );
   }
 
   // Store-store conflicts
@@ -539,247 +504,29 @@ ListStores( BitQS *bitqs, int x )
   }
   
   EXECUTE_IF_SET_IN_BITMAP( res_self, 0, v, bi ) {
-    kvec_t(int) *stmts = &es2pointers[v];
-    ans += iterate_equivalent_set( stmts );
+    VECTOR(int) *stmts = &es2pointers[v];
+    ans += iterate_equivalent_set( stmts, filter );
   }
 
   return ans;
 }
 
 int
-ListConflicts( BitQS *bitqs, int x )
+BitQS::ListConflicts( int x, const IFilter* filter )
 {
-  x = bitqs->pt_map[x];
-  if ( x == -1 ) return 0;
+  int xx = bitqs->pt_map[x];
+  if ( xx == -1 ) return 0;
 
   int ans = 0;
 
-  if ( x < bitqs->n_st ) { 
+  if ( xx < bitqs->n_st ) { 
     // Store
-    ans = ListStores( bitqs, x );
-  }
-  // else {
-  //   // Load
-  //   ans = ListLoads( bitqs, x );
-  // }
-
-  return ans;
-}
-
-void
-execute_query_plan( BitQS *bitqs )
-{
-  int x, y;
-
-  FILE *fp = fopen( query_plan, "r" );
-  if ( fp == NULL ) {
-    fprintf( stderr, "Cannot open the query plan file. Simulation exits.\n" );
-    return;
-  }
-
-  // Read the base pointers for query evaluation
-  // We also aggregate the base pointers by their representatives
-  int n_es = bitqs->n_es;
-  kvec_t(int) pointers;
-  kvec_t(int) *es2baseptrs = new kvec_t(int)[n_es];
-  
-  kv_init(int, pointers);
-  while ( fscanf( fp, "%d", &x ) != EOF ) {
-    pointers.push_back( x );
-    int es = bitqs->pt_map[x];
-    //if ( es > n_es ) printf( "%d\n", x );
-    if ( es != -1 )
-      es2baseptrs[es].push_back(x);
-  }
-  
-  fclose( fp );
-
-  int n_query = pointers.size();
-  //fprintf( stderr, "Query plan loaded : %d entries.\n", n_query );
-  show_res_use( NULL );
-
-
-  // Execute
-  for ( int i = 0; i < n_query; ++i ) {
-    switch ( query_type ) {
-    case IS_ALIAS:
-      {
-	x = pointers[i];
-	// No difference in PesTrie case
-	for ( int j = i + 1; j < n_query; ++j ) {
-	  y = pointers[j];
-	  bool ans = IsAlias( bitqs, x, y );
-	  if ( print_answers )
-	    printf( "(%d, %d) : %s\n", x, y, ans == true ? "true" : "false" );
-	}
-      }
-      break;
-      
-    case LIST_POINTS_TO:
-      {
-	x = pointers[i];
-	int ans = ListPointsTo( bitqs, x );
-	if ( print_answers )
-	  printf( "%d : %d\n", x, ans );
-      }
-      break;
-      
-    case LIST_ALIASES:
-      {
-	int ans = 0;
-	
-	if ( slow_mode )
-	  ans = ListAliases_by_pointers( bitqs, i, pointers );
-	else {
-	  x = pointers[i];
-	  ans = ListAliases_by_representatives( bitqs, x, es2baseptrs );
-	}
-	
-	if ( print_answers )
-	  printf( "%d : %d\n", x, ans );
-      }
-      break;
-    }
-  }
-
-  delete[] es2baseptrs;
-}
-
-// We generate random pointers for evaluation
-void 
-traverse_result( BitQS *bitqs )
-{
-  int x, y;
-  int ans = 0;
-
-  if ( (index_type == PT_MATRIX && query_type >= LIST_ACC_VARS) ||
-       (index_type == SE_MATRIX && query_type < LIST_ACC_VARS) ) {
-    fprintf( stderr, "The query commands are supported by input index file.\n" );
-    return;
-  }
-
-  int n = bitqs->n;
-  int m = bitqs->m;
-  int n_query = ( query_type == LIST_POINTED_TO ? m : n );
-
-  // We permute the pointers/objects
-  /*
-  int *queries = new int[n_query];
-  for ( int i = 0; i < n_query; ++i ) queries[i] = i;
-
-  for ( int i = 0; i < n_query - 1; ++i ) {
-    int j = queries[i];
-    int k = rand() % ( n_query - i ) + i;
-    queries[i] = queries[k];
-    queries[k] = j;
-  }
-  */
-
-  for ( int i = 0; i < n_query; ++i ) {
-    //x = queries[i];
-    x = i;
-
-    switch ( query_type ) {
-    case IS_ALIAS:
-      y = n_query - x;
-      ans += (IsAlias( bitqs, x, y ) == true ? 1 : 0);
-      break;
-      
-    case LIST_POINTS_TO:
-      ans += ListPointsTo( bitqs, x );
-      break;
-      
-    case LIST_POINTED_TO:
-      ans += ListPointedTo( bitqs, x );
-      break;
-      
-    case LIST_ALIASES:
-      ans += ListAliases_by_representatives( bitqs, x, NULL );
-      break;
-  
-    case LIST_ACC_VARS:
-      ans += ans += ListModRefVars(bitqs, x);
-      break;
-      
-    case LIST_CONFLICTS:
-      ans += ListConflicts(bitqs, x);
-      break;
-    }
-  }
-  
-  fprintf( stderr, "\nReference answer = %d\n", ans );
-  //delete[] queries;
-}
-
-// We rebuild the index currently
-static bool
-sanity_check( BitQS *bitqs )
-{
-  FILE *fp;
-  
-  fp = fopen( check_file, "r" );
-  if ( fp == NULL ) {
-    fprintf( stderr, "Loading verify file failed.\n" );
-    return false;
-  }
-
-  BitIndexer *indexer = parse_points_to_input( fp, 
-					       INPUT_START_BY_SIZE );
-  fclose( fp );
-  
-  indexer->fp_generate_index( indexer, true );
-  
-  // line by line compare
-  Cmatrix **mat_set_query = bitqs->qmats;
-  Cmatrix **mat_set_index = indexer->imats;
-  bool ret = true;
-
-  if ( matrix_equal_p( mat_set_query[I_PT_MATRIX],
-		       mat_set_index[I_PT_MATRIX] ) == true ) {
-    
-    if ( matrix_equal_p( mat_set_query[I_ALIAS_MATRIX],
-			 mat_set_index[I_ALIAS_MATRIX] ) == true ) {
-      fprintf( stderr, "Verify successfully.\n" );
-    }
-    else {
-      fprintf( stderr, "Verify alias matrix failed.\n" );
-      ret = false;
-    }
+    ans = ListStores( x, filter );
   }
   else {
-    fprintf( stderr, "Verify points-to matrix failed.\n" );
-    ret = false;
+    // Load
+    ans = ListLoads( x, filter );
   }
 
-  delete indexer;
-
-  return ret;
-}
-
-int main( int argc, char** argv )
-{
-  if ( parse_options( argc, argv ) == 0 )
-    return -1;
-
-  BitQS *bitqs = load_index();
-  if ( bitqs == NULL ) return -1;
-  if ( check_file != NULL &&
-       sanity_check( bitqs ) == false )
-    return -1;
-
-  query_plan != NULL ? execute_query_plan(bitqs) : traverse_result(bitqs);
-  
-  // if ( query_type == IS_ALIAS ) {
-  //   long total = (long)n_query * (n_query -1);
-  //   fprintf ( stderr, "Direct answers = %d, total = %lld\n", cnt_same_es, total/2 );
-  // }
-
-  delete bitqs;
-
-  char buf[128];
-  sprintf( buf, "%s querying (%s)", query_strs[query_type],
-	   slow_mode == true ? "on-demand" : "use-index" );
-  show_res_use( buf );
-
-  return 0;
+  return ans;
 }

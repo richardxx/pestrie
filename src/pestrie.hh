@@ -15,7 +15,7 @@
 #include <vector>
 #include "bitmap.h"
 #include "segtree.hh"
-#include "options.h"
+#include "constants.hh"
 
 struct PesOpts 
 {
@@ -163,18 +163,19 @@ public:
 
   void profile_index();
 
-  void profile_additional();
+  void advanced_profile_pestrie();
 
 public:
   // PesTrie specialized processing functions
   // They should be implemented sub-classes
   virtual void preprocess() = 0;
   virtual int build_index() = 0;
-  virtual void profile_pestrie() = 0;
+  virtual void basic_profile_pestrie() = 0;
 };
 
 
 // This class is for indexing points-to information
+// Computing A*A^T
 class PesTrieSelf : public PesTrie 
 {
 public:
@@ -184,7 +185,7 @@ public:
 public:
   void preprocess();
   int build_index();
-  void profile_pestrie();
+  void basic_profile_pestrie();
 
 private:
   void self_permute_rows();
@@ -192,6 +193,7 @@ private:
 
 
 // This class is for indexing mod-ref information
+// Computing A*B
 class PesTrieDual : public PesTrie 
 {
 public:
@@ -201,8 +203,8 @@ public:
 public:
   void preprocess();
   int build_index();
-  void profile_pestrie();
-
+  void basic_profile_pestrie(); 
+  
 private:
   void dual_permute_rows();
 };
@@ -210,9 +212,10 @@ private:
 
 // This function should be called first!
 extern void init_pestrie();
+
 //
-extern void build_index_with_pestrie( PesTrie* );
 extern PesTrie* self_parse_input( FILE*, const PesOpts* );
 extern PesTrie* dual_parse_input( FILE*, const PesOpts* );
+extern void build_index_with_pestrie( PesTrie* );
 
 #endif

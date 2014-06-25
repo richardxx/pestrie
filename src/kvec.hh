@@ -117,7 +117,7 @@ public:
   
   void resize( int size )
   {
-    T* b = (T*)malloc( sizeof(T) * size);
+    T* b = new T[size];
 
     if ( a == NULL ) {
       a = b;
@@ -146,7 +146,7 @@ public:
   T* end() { return a + n; }
   int size() { return n; }
   
-  void push_back( T& x )
+  void push_back( const T &x )
   {
     if ( n == m ) {
       int s = (m << 1) + 3;

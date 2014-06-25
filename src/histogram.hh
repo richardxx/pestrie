@@ -154,7 +154,7 @@ public:
     maxN = limits.size();
     if ( firstN == -1 || firstN > maxN ) firstN = maxN; 
     
-    fprintf( out, "\n%s\n", title );
+    fprintf( out, "%s\n", title );
     if ( count == 0 ) {
       fprintf( out, "No samples are inserted, no output!\n" );
       return;

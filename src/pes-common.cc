@@ -219,6 +219,7 @@ void PesTrie::profile_index()
   int n_rects = seg_tree->n_rects;
   int n_total_stored = n_points + n_vertis + n_horizs + n_rects;
 
+  fprintf( stderr, "\n----------Pestrie Index--------------\n" );
   fprintf( stderr, "We totally generate %d rectangles, %d of them are indexed.\n", 
 	   n_gen_rects, n_total_stored );
 
@@ -244,7 +245,7 @@ void PesTrie::profile_index()
 }
 
 void 
-PesTrie::advanced_profile_index()
+PesTrie::advanced_profile_pestrie()
 {
   if ( this->pes_opts->profile_in_detail == false )
     return;
@@ -328,7 +329,9 @@ PesTrie::advanced_profile_index()
     delete[] wts;
     
     fprintf( stderr, "\n" );
-    fprintf( stderr, "Max hub degree is %.1lf. Arithmetic mean is %.1lf. Geometric mean is %.1lf\n", max_wt, ari_avg, geo_avg );
+    fprintf( stderr, "Max hub degree is %.1lf.\n", max_wt );
+    fprintf( stderr, "Arithmetic mean is %.1lf.\n", ari_avg ); 
+    fprintf( stderr, "Geometric mean is %.1lf.\n", geo_avg );
     hubD.print_result( stderr, "Hub degrees Distribution", false );
     pted_sizes.print_result( stderr, "Pointed-to-by Matrix", false );
   }
@@ -471,7 +474,7 @@ build_index_with_pestrie( PesTrie* pestrie )
   pestrie->build_index();
 
   // Output the statistics of PesTrie index
-  pestrie->profile_pestrie();  
+  pestrie->basic_profile_pestrie();
+  pestrie->advanced_profile_pestrie();
   pestrie->profile_index();
-  pestrie->advanced_profile_index();
 }

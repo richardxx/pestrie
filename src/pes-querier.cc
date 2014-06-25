@@ -219,17 +219,17 @@ process_figures( FILE* fp )
   segRoot = build_seg_tree( 0, vertex_num );
 
   // We insert the figures into the tree
-  int buf_size;
+  int n_labels;
   int *labels = new int[vertex_num * 3];
   VECTOR(Rectangle*) all_rects(vertex_num);
 
   for ( int x1 = 0; x1 < vertex_num; ++x1 ) {
-    fread( &buf_size, sizeof(int), 1, fp );
-    if ( buf_size == 0 ) continue;
-    fread( labels, sizeof(int), buf_size, fp );
+    fread( &n_labels, sizeof(int), 1, fp );
+    if ( n_labels == 0 ) continue;
+    fread( labels, sizeof(int), n_labels, fp );
 
     int i = 0;
-    while ( i < buf_size ) {
+    while ( i < n_labels ) {
       int y1 = labels[i++];
       int x2, y2;
 
@@ -256,7 +256,7 @@ process_figures( FILE* fp )
 	y2 = labels[i++];
       }
 
-      // First, the reversed rect
+      // First, insert the reversed figure directly
       VLine* p = new VLine(x1, x2);
       if ( y1 == y2 ) {
 	segUnits[y1]->add_vertis(p);
@@ -265,7 +265,7 @@ process_figures( FILE* fp )
 	insert_rect( y1, y2, p, segRoot );
       }
 
-      // Second, cache it
+      // Second, we cache the original figure
       Rectangle* r = new Rectangle(x1, x2, y1, y2);
       if ( x1 == x2 ) {
 	segUnits[x1]->add_vertis(r);
@@ -276,10 +276,11 @@ process_figures( FILE* fp )
     }
   }
 
-  // We insert the cached rectangle
+  // We sort the cached figures by y1
   sort( all_rects.begin(), all_rects.end(), comp_rect );
-  int size = all_rects.size();
 
+  // We insert the cached figures
+  int size = all_rects.size();
   for ( int i = 0; i < size; ++i ) {
     Rectangle* r = all_rects[i];
     insert_rect( r->x1, r->x2, r, segRoot );
@@ -289,30 +290,9 @@ process_figures( FILE* fp )
   delete[] labels;
 }
 
-static bool 
-read_index()
+bool 
+read_index(FILE* fp, int index_type )
 {
-  char magic_code[8];
-  FILE *fp;
-
-  fp = fopen( input_file, "rb" );
-  if ( fp == NULL )
-    return false;
-
-  fread( magic_code, sizeof(char), 4, fp );
-  magic_code[4] = 0;
-  index_type = UNDEFINED_MATRIX;
-
-  if ( strcmp( magic_code, PESTRIE_PT_1 ) == 0)
-    index_type = PT_MATRIX;
-  else if ( strcmp( magic_code, PESTRIE_SE_1 ) == 0 )
-    index_type = SE_MATRIX;
-
-  if ( index_type == UNDEFINED_MATRIX ) {
-    fprintf( stderr, "This is an INVALID PesTrie index file.\n" );
-    return false;
-  }
-  
   // Loading and decoding the persistence file
   prepare_pestrie_info(fp);
   process_figures(fp);
@@ -476,20 +456,21 @@ IsAlias( int x, int y )
   if ( binary_search( p->vertis, y ) ) 
     return true;
 
-  /*
-  // We traverse the segment tree bottom up
-  while ( p != NULL ) {    
-    if ( binary_search( p->rects, y ) ) 
-      return true;
-    p = p->parent;
+  if ( !demand_merging ) {
+    // We traverse the segment tree bottom up
+    while ( p != NULL ) {    
+      if ( binary_search( p->rects, y ) ) 
+	return true;
+      p = p->parent;
+    }
   }
-  */
+  else {
+    if ( p->merged == false )
+      recursive_merge(p);
 
-  if ( p->merged == false )
-    recursive_merge(p);
-
-  if ( binary_search( p->rects, y ) )
-    return true;
+    if ( binary_search( p->rects, y ) )
+      return true;
+  }
 
   return false;
 }
@@ -579,7 +560,7 @@ ListAliases( int x, VECTOR(int) *es2baseptrs )
 }
 
 static int 
-ListPointedTo( int o )
+ListPointedBy( int o )
 {
   return ListAliases( o + n, NULL );
 }

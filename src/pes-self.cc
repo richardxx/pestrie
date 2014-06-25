@@ -72,12 +72,11 @@ PesTrieSelf::preprocess()
 
 
 void 
-PesTrieSelf::profile_pestrie()
+PesTrieSelf::basic_profile_pestrie()
 {
-  fprintf( stderr, "\n----------Pestrie Index Profile------------\n" );
+  fprintf( stderr, "\n----------Pestrie Profile------------\n" );
   show_res_use( "PesTrie indexing" );
 
-  int m = this->m;
   int cm = this->cm;
   int vn = this->vn;
   int *es_size = this->es_size;

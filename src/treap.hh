@@ -34,19 +34,19 @@ TreapNode* remove_treap( TreapNode*, int);
 void clean_treap( TreapNode* );
 
 
-// Inorder traversal, for the reason of speeding up the index load
+// Inorder traversal of treap and collect the figures
 template<class T> void 
-visit_treap( TreapNode *p, VECTOR(T)* collector )
+inorder_treap( TreapNode *p, VECTOR(T) &collector )
 {
   if ( p == NULL ) return;
   
   if ( p->left != NULL )
-    visit_treap<T>( p->left, collector );
+    inorder_treap<T>( p->left, collector );
   
-  collector->push_back((T)p->data);
+  collector.push_back((T)p->data);
   
   if ( p->right != NULL )
-    visit_treap<T>( p->right, collector );
+    inorder_treap<T>( p->right, collector );
 }
 
 

@@ -96,9 +96,9 @@ PesTrieDual::preprocess()
 
 
 void 
-PesTrieDual::profile_pestrie()
+PesTrieDual::basic_profile_pestrie()
 {
-  fprintf( stderr, "\n----------Pestrie Index Profile------------\n" );
+  fprintf( stderr, "\n----------Pestrie Profile------------\n" );
   show_res_use( "PesTrie indexing" );
 
   int m = this->m;

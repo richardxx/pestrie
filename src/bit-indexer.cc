@@ -31,6 +31,7 @@ static bool merging_eqls = true;
 static void
 print_help(const char* prog_name) 
 {
+  printf( "Bitmap indexer version %s\n", BIT_VERSION );
   fprintf( stderr, "Usage : %s [options] input_file [output_file]\n", prog_name );
   fprintf( stderr, "Options  : \n" );
   fprintf( stderr, "-e       : Specify the input matrix type\n" );

@@ -3,8 +3,11 @@
  * by richardxx, 2012.9
  */
 
-#ifndef OPTIONS_H
-#define OPTIONS_H
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
+
+#define PES_VERSION "2.1"
+#define BIT_VERSION "1.3"
 
 // Magic numbers
 #define PESTRIE_PT_1 "PTP1"  

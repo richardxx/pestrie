@@ -7,11 +7,12 @@
 #ifndef SEGTREE_H
 #define SEGTREE_H
 
+#include <cstdio>
 #include "treap.hh"
 
 struct SegTreeNode
 {
-  // The size of segment tree would be larger if we split the rectangles and points
+  // A balanced tree structure that sorts the figures
   struct TreapNode *rects;
 
   SegTreeNode()
@@ -49,7 +50,7 @@ void
 insert_segtree_wrapper( SegTree*, const Rectangle& );
 
 int
-dump_figures( SegTree*, FILE* fp );
+dump_figures( SegTree*, std::FILE* fp );
 
 void
 flush_left_shapes( SegTree* );
