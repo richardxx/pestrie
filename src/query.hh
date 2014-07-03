@@ -28,6 +28,7 @@ class IFilter
   virtual bool validate(int x) = 0;
 };
 
+
 // Querying interface
 class IQuery
 {
@@ -49,11 +50,23 @@ public:
 
   // Show all the statements that read/write conflict to x 
   virtual int ListConflicts( int x, const IFilter* filter ) = 0;
+
+public:
+  virtual int getPtrEqID(int x);
+  virtual int getObjEqID(int x);
+
+public:
+  virtual int nOfPtrs() = 0;
+  virtual int nOfObjs() = 0;
+  virtual int getIndexType() = 0;
 };
 
-//
-IQuery* load_bitmap_index( std::FILE*, int );
+// Generating the querying instance
 
-IQuery* load_pestrie_index( std::FILE*, int );
+extern IQuery* 
+load_bitmap_index( std::FILE* fp, int index_type, bool t_mode );
+
+extern IQuery* 
+load_pestrie_index( std::FILE* fp, int index_type, bool d_mering );
 
 #endif

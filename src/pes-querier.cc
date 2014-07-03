@@ -14,58 +14,226 @@
 #include <algorithm>
 #include <ctime>
 #include <set>
-#include "query.h"
-#include "pes-querier.hh"
+#include "shapes.hh"
 #include "profile_helper.h"
 #include "histogram.hh"
-#include "bitmap.h"
+//#include "bitmap.h"
+#include "query.hh"
+#include "query-inl.hh"
 
 using namespace std;
 
-// The querying segment tree
-static QHeader **segUnits, *segRoot;
+// The segment tree node
+// We still use segment tree as the fundamental querying structure
+class SegNode
+{
+public:
+  // This node represents the range [l, r]
+  int l, r;
+  SegNode *left, *right, *parent;
+  bool merged;
 
-// Points-to or side-effect information
-static int index_type;
+  VECTOR(VLine*) rects;
+  VECTOR(VLine*) vertis;
+  //VECTOR(int) pointsto;
 
-// The maximum preorder timestamp for the store statements
-static int max_store_prev;
+  SegNode()
+  {
+    left = right = NULL;
+    parent = NULL;
+    merged = false;
+  }
 
-// The number of pointers and objects
-static int n, m, n_trees, n_es;
-static int vertex_num, n_figures;
-// Mapping from pointer ID to tree ID
-static int *tree;
-// Mapping from pointer ID to PesTrie ID
-static int *preV;
-// Mapping tree ID to pre-order stamp
-static int *root_prevs;
-// Mapping the pre-order of root node to tree ID
-static int *root_tree;
+  void add_rect( VLine* p ) 
+  { 
+    rects.push_back(p);
+  }
 
-//
-static VECTOR(int) *es2pointers;
-static VECTOR(int) *es2objs;
+  void add_vertis( VLine* p ) 
+  { 
+    vertis.push_back(p);
+  }
+
+  int n_of_rects() 
+  {
+    return rects.size();
+  }
+};
+
+// The segment tree structure for querying system
+class SegTree
+{
+public:
+  SegTree(int maxN)
+  {
+    segUnits = new SegNode[maxN];
+    segRoot = build_seg_tree(0, maxN);
+  }
+
+  void optimize_seg_tree( SegNode* p );
+  void recursive_merge( SegNode* p );
+
+private:
+  SegNode* build_seg_tree( int l, int r );
+
+private:
+  // The querying segment tree
+  SegNode **segUnits, *segRoot;
+};
+
+
+SegNode*
+SegTree::build_seg_tree( int l, int r )
+{
+  int x = (l+r) / 2;
+  SegNode* p = segUnits[x]; 
+  
+  p->l = l;
+  p->r = r;
+
+  if ( l < x ) {
+    p->left = build_seg_tree( l, x - 1 );
+    p->left->parent = p;
+  }
+  
+  if ( x + 1 < r ) {
+    p->right = build_seg_tree( x + 1, r ); 
+    p->right->parent = p;
+  }
+  
+  return p;
+}
+
+/*
+ * We update the parent links to skip the empty nodes.
+ */ 
+void
+PesQS::optimize_seg_tree( SegNode* p ) 
+{
+  SegNode* q = p->parent;
+  
+  if ( q != NULL &&
+       q->n_of_rects() == 0 ) {
+    q = q->parent;
+    p->parent = q;
+  }
+  
+  if ( q == NULL )
+    p->merged = true;
+
+  if ( p->left != NULL )
+    optimize_seg_tree( p->left );
+  if ( p->right != NULL )
+    optimize_seg_tree( p->right );
+}
+
+void
+SegTree::insert_point( int x, int y )
+{
+  VLine* p = new VLine(y, y);
+  segUnits[x]->add_vertis(p);
+}
+
+/*
+ * We add at most log(n) references to each figure.
+ * [x1, x2]: the X range of insertion rectangle
+ */
+void
+SegTree::insert_rect( int x1, int x2, VLine* pr, SegNode* p )
+{
+  if ( x1 <= p->x1 && x2 >= p->x2 ) {
+    // We only consider the full coverage
+    p->add_rect(pr);
+    return;
+  }
+
+  int x = (p->x1 + p->x2) / 2;
+  p = segUnits[x];
+  
+  if ( x1 < x ) insert_rect( x1, x2, pr, p->left );
+  if ( x2 > x ) insert_rect( x1, x2, pr, p->right );
+}
+
+
+
+class PesQS : public IQuery
+{
+public:
+  // Interface functions
+  bool IsAlias( int x, int y);
+  int ListPointsTo( int x, const IFilter* filter );
+  int ListAliases( int x, const IFilter* filter );
+  int ListPointedBy( int o, const IFilter* filter );
+  int ListModRefVars( int x, const IFilter* filter );
+  int ListConflicts( int x, const IFilter* filter );
+
+public:
+  int getPtrEqID(int x) { return preV[x]; }
+  int getObjEqID(int x) { return preV[x+n]; }
+
+public:
+  int nOfPtrs() { return n; }
+  int nOfObjs() { return m; }
+  int getIndexType() { return index_type; }
+
+public:
+  PesQS(int n_ptrs, int n_objs, int n_vertex, int type, int d_merging)
+  {
+    n = n_ptrs; m = n_objs; vertex_num = n_vertex;
+    index_type = type;
+    demand_merging = d_merging;
+
+    tree = new int[n_ptrs+n_objs];
+    preV = new int[n_ptrs+n_objs];
+    root_prevs = new int[n_objs+1];
+    root_tree = new int[n_vertex+1];
+    es2ptrs = new VECTOR(int)[n_vertex];
+    
+    if ( type == PT_MATRIX ) {
+      es2objs = new VECTOR(int)[n_vertex];
+    }
+
+    qtree = new SegTree(n_vertex);
+  }
+
+public:
+  void rebuild_eq_groups( FILE* fp );
+  
+private:
+  SegTree* qtree;
+
+  // The maximum preorder timestamp for the store statements
+  int max_store_prev;
+
+  // The number of pointers, objects, trees, and nodes
+  int n, m, n_trees, vertex_num;
+  // Mapping from pointer to tree ID
+  int *tree;
+  // Mapping from pointer to PesTrie ID
+  int *preV;
+  // Recording pre-order of the roots
+  int *root_prevs;
+  // Mapping the pre-order of root node to tree ID (-1 means this node is not a root)
+  int *root_tree;
+
+  // Mapping from equivalent set to pointers/objects
+  VECTOR(int) *es2ptrs, *es2objs;
+
+  // Points-to or side-effect information
+  int index_type;
+  
+  // Merging the aliasing information bottom up on demand
+  bool demand_merging;
+};
+
 
 //Statistics
-static int cnt_same_tree = 0;
+//static int cnt_same_tree = 0;
 
 
-static void
-prepare_pestrie_info( FILE* fp )
+void
+PesQS::rebuild_eq_groups( FILE* fp )
 {
-  fread( &n, sizeof(int), 1, fp );
-  fread( &m, sizeof(int), 1, fp );
-  fread( &vertex_num, sizeof(int), 1, fp );
-  fread( &n_figures, sizeof(int), 1, fp );
-
-  tree = new int[n+m];
-  preV = new int[n+m];
-  root_prevs = new int[m+1];
-  root_tree = new int[vertex_num+1];
-  es2pointers = new VECTOR(int)[vertex_num];
-  es2objs = new VECTOR(int)[vertex_num];
-
   // Read in the pre-order descriptors for both pointers and objects
   fread( preV, sizeof(int), n+m, fp );
 
@@ -101,7 +269,7 @@ prepare_pestrie_info( FILE* fp )
   }
 
   if ( index_type == SE_MATRIX ) 
-    max_store_prev = root_prevs[m/2];
+    pesqs->max_store_prev = root_prevs[m/2];
 
   // We re-discover the tree codes for pointers through the binary search
   // Sentinels
@@ -124,105 +292,31 @@ prepare_pestrie_info( FILE* fp )
       
       // Assign the tree code
       tree[i] = s;
-      es2pointers[preI].push_back(i);
+      es2ptrs[preI].push_back(i);
     }
     else
       tree[i] = -1;
   }
 }
 
-static QHeader*
-build_seg_tree( int l, int r )
-{
-  int x = (l+r) / 2;
-  QHeader* p = new QHeader; 
-  
-  p->x1 = l;
-  p->x2 = r;
-  
-  if ( l != r ) {
-    if ( l <= x ) {
-      p->left = build_seg_tree( l, x );
-      p->left->parent = p;
-    }
-    
-    if ( x < r ) {
-      p->right = build_seg_tree( x + 1, r ); 
-      p->right->parent = p;
-    }
-  }
 
-  segUnits[x] = p;
-  return p;
-}
-
-/*
- * We update the parent links to skip the empty nodes.
- */ 
-static void
-optimize_seg_tree( QHeader* p ) 
-{
-  QHeader* q = p->parent;
-  
-  if ( q != NULL &&
-       q->n_of_rects() == 0 ) {
-    q = q->parent;
-    p->parent = q;
-  }
-  
-  if ( q == NULL )
-    p->merged = true;
-
-  if ( p->left != NULL )
-    optimize_seg_tree( p->left );
-  if ( p->right != NULL )
-    optimize_seg_tree( p->right );
-}
-
-
-static void
-insert_point( int x, int y )
-{
-  VLine* p = new VLine(y, y);
-  segUnits[x]->add_vertis(p);
-}
-
-/*
- * We add log(n) references to each figure.
- */
-static void 
-insert_rect( int x1, int x2, VLine* pr, QHeader* p )
-{
-  if ( x1 <= p->x1 && x2 >= p->x2 ) {
-    // We only consider the full coverage
-    p->add_rect(pr);
-    return;
-  }
-
-  int x = (p->x1 + p->x2) / 2;
-  p = segUnits[x];
-  
-  if ( x1 < x ) insert_rect( x1, x2, pr, p->left );
-  if ( x2 > x ) insert_rect( x1, x2, pr, p->right );
-}
-
-static bool comp_rect( VLine* r1, VLine* r2 )
+static bool 
+comp_rect( VLine* r1, VLine* r2 )
 {
   return r1->y1 < r2->y1;
 }
 
-static void
-process_figures( FILE* fp )
+void
+PesQS::load_figures( FILE* fp )
 {
   // First we initialize the segment tree
-  segUnits = new QHeader*[vertex_num];
   segRoot = build_seg_tree( 0, vertex_num );
 
-  // We insert the figures into the tree
   int n_labels;
   int *labels = new int[vertex_num * 3];
   VECTOR(Rectangle*) all_rects(vertex_num);
 
+  // Loading and processing each figure
   for ( int x1 = 0; x1 < vertex_num; ++x1 ) {
     fread( &n_labels, sizeof(int), 1, fp );
     if ( n_labels == 0 ) continue;
@@ -286,38 +380,25 @@ process_figures( FILE* fp )
     insert_rect( r->x1, r->x2, r, segRoot );
   }
 
+  // Optimize the parent links
   optimize_seg_tree( segRoot );
   delete[] labels;
 }
 
-bool 
-read_index(FILE* fp, int index_type )
-{
-  // Loading and decoding the persistence file
-  prepare_pestrie_info(fp);
-  process_figures(fp);
-
-  fprintf( stderr, "\n-------Input: %s-------\n", input_file );
-  show_res_use( "Index loading" );
-
-  fclose( fp );  
-  return true;
-}
-
-static void 
-profile_pestrie()
+void 
+PesQS::profile_pestrie()
 {
   int non_empty_nodes = 0;
   int n_pts = 0, n_rects = 0;
 
   for ( int i = 0; i < vertex_num; ++i ) {
     // Test 1:
-    VECTOR(int) ptrs = es2pointers[i];
+    VECTOR(int) ptrs = es2ptrs[i];
     if ( ptrs.size() > 0 )
       ++non_empty_nodes;
 
     // Test 2:
-    struct QHeader* p = segUnits[i];
+    struct SegNode* p = segUnits[i];
     n_rects += p->rects.size();
     n_pts += p->vertis.size();
   }
@@ -330,28 +411,12 @@ profile_pestrie()
 	   n_rects + n_pts ); 
 }
 
-static int
-iterate_equivalent_set( VECTOR(int) *es_set )
-{
-  int ans = 0;
-  int size = es_set->size();
-
-  for ( int i = 0; i < size; ++i ) {
-    //    int q = es_set->at(i);
-    //    if ( q > 0 )
-      // This is to avoid the compiler smartly deleting the code.
-      ans++;
-  }
-
-  return ans;
-}
-
 // We do merging sort
-static void
-recursive_merge( QHeader* p )
+void
+PesQS::recursive_merge( SegNode* p )
 {
-  if ( p->merged == true ) return;  
-  if ( p->parent == NULL ) return;
+  if ( p->merged == true ||
+       p->parent == NULL ) return;
   recursive_merge( p->parent );
 
   VECTOR(VLine*) &list1 = p->parent->rects;
@@ -434,17 +499,17 @@ binary_search( VECTOR(VLine*) &rects, int y )
 }
 
 
-static bool
-IsAlias( int x, int y )
+bool
+PesQS::IsAlias( int x, int y )
 {
-  struct QHeader *p;
+  struct SegNode *p;
 
   int tr_x = tree[x];
   if ( tr_x == -1 ) return false;
   int tr_y = tree[y];
   if ( tr_y == -1 ) return false;
   if ( tr_x == tr_y ) {
-    ++cnt_same_tree;
+    //++cnt_same_tree;
     return true;
   }
 
@@ -465,9 +530,7 @@ IsAlias( int x, int y )
     }
   }
   else {
-    if ( p->merged == false )
-      recursive_merge(p);
-
+    recursive_merge(p);
     if ( binary_search( p->rects, y ) )
       return true;
   }
@@ -477,10 +540,10 @@ IsAlias( int x, int y )
 
 // List query in real use should be passed in a handler.
 // That handler decide what to do with the query answer.
-static int 
-ListPointsTo( int x )
+int 
+PesQS::ListPointsTo( int x, const IFilter* filter )
 {
-  QHeader *p;
+  SegNode *p;
   VECTOR(int) *objs;
   int ans = 0;
 
@@ -498,10 +561,10 @@ ListPointsTo( int x )
 }
 
 // Find all the pointers y that *x and *y is an alias pair
-static int 
-ListAliases( int x, VECTOR(int) *es2baseptrs )
+int 
+PesQS::ListAliases( int x, const IFilter* filter )
 {
-  QHeader *p;
+  SegNode *p;
   VLine *r;
   int size;
 
@@ -512,11 +575,8 @@ ListAliases( int x, VECTOR(int) *es2baseptrs )
   x = preV[x];
 
 #define VISIT_POINT(v)							\
-  do {									\
-    VECTOR(int) *ptrs = ( es2baseptrs == NULL ? &es2pointers[v] : &es2baseptrs[v] ); \
-    ans += iterate_equivalent_set( ptrs );				\
-  } while(0)
-
+  ans += iterate_equivalent_set( ptrs, filter );			
+  
 #define VISIT_RECT(r)							\
   do {									\
     int lower = r->y1;							\
@@ -559,172 +619,47 @@ ListAliases( int x, VECTOR(int) *es2baseptrs )
   return ans;
 }
 
-static int 
-ListPointedBy( int o )
+int 
+PesQS::ListPointedBy( int o, const IFilter* filter )
 {
-  return ListAliases( o + n, NULL );
+  return ListAliases( o + n, filter );
 }
 
-static int 
-ListModRefVars( int x )
+int 
+PesQS::ListModRefVars( int x, const IFilter* filter )
 {
-  return ListPointsTo( x );
+  return ListPointsTo( x, filter );
 }
 
-static int
-ListConflicts( int x )
+int
+PesQS::ListConflicts( int x, const IFilter* filter )
 {
   int ans = 0;
 
   if ( preV[x] < max_store_prev )
-    ans = ListAliases( x, NULL );
+    ans = ListAliases( x, filter );
   
   return ans;
 }
 
-void
-execute_query_plan()
+PesQS*
+load_pestrie_index(FILE* fp, int index_type, int d_merging )
 {
-  int x, y;
-
-  FILE *fp = fopen( query_plan, "r" );
-  if ( fp == NULL ) {
-    fprintf( stderr, "Cannot open the query plan file. Simulation exits.\n" );
-    return;
-  }
-
-  // Read
-  VECTOR(int) queries;
-  VECTOR(int) *es2baseptrs = new VECTOR(int)[vertex_num];
-    
-  while ( fscanf( fp, "%d", &x ) != EOF ) {
-    queries.push_back(x);
-    int es = preV[x];
-    if ( es >= vertex_num ) printf( "oops\n" );
-    if ( es != -1 )
-      es2baseptrs[es].push_back(x);
-  }
+  // Loading the header info
+  fread( &n, sizeof(int), 1, fp );
+  fread( &m, sizeof(int), 1, fp );
+  fread( &vertex_num, sizeof(int), 1, fp );
   
-  fclose( fp );
-  int n_query = queries.size();
-  //fprintf( stderr, "Query plan loaded : %d entries.\n", n_query );
-  show_res_use( NULL );
-
-  // Execute
-  for ( int i = 0; i < n_query; ++i ) {
-    x = queries[i];
-    
-    switch ( query_type ) {
-    case IS_ALIAS:
-      // No difference in PesTrie cass
-      for ( int j = i + 1; j < n_query; ++j ) {
-	y = queries[j];
-	bool aliased = IsAlias( x, y );
-	if ( print_answers )
-	  printf( "(%d, %d) : %s\n", x, y, aliased == true ? "true" : "false" );
-      }
-      break;
-
-    case LIST_POINTS_TO:
-      {
-	int ans = ListPointsTo( x );
-	if ( print_answers )
-	  printf( "%d : %d\n", x, ans );
-      }
-      break;
-      
-    case LIST_ALIASES:
-      {
-	int ans = ListAliases( x, es2baseptrs );
-	if ( print_answers )
-	  printf( "%d : %d\n", x, ans );
-      }
-      break;
-    }
-  }
-
-  delete[] es2baseptrs;
-}
-
-void
-traverse_result()
-{
-  int x, y;
-  int ans = 0;
-
-  if ( (index_type == PT_MATRIX && query_type >= LIST_ACC_VARS) ||
-       (index_type == SE_MATRIX && query_type < LIST_ACC_VARS) ) {
-    fprintf( stderr, "The query commands are supported by input index file.\n" );
-    return;
-  }
-
-  int n_query = ( query_type == LIST_POINTED_TO ? m : n );
+  // Initialize the querying struture
+  PesQS* pesqs = new PesQS( n, m, vertex_num, index_type, d_merging );
   
-  // We permute the pointers/objects
-  /*
-  int *queries = new int[n_query];
-  for ( int i = 0; i < n_query; ++i ) queries[i] = i;
-
-  for ( int i = 0; i < n_query - 1; ++i ) {
-    int j = queries[i];
-    int k = rand() % ( n_query - i ) + i;
-    queries[i] = queries[k];
-    queries[k] = j;
-  }
-  */
-
-  for ( int i = 0; i < n_query; ++i ) {
-    //x = queries[i];
-    x = i;
-
-    switch (query_type) {
-    case IS_ALIAS:
-      y = n_query - x;
-      ans += (IsAlias( x, y ) == true ? 1 : 0);
-      break;
-      
-    case LIST_POINTS_TO:
-      ans += ListPointsTo(x);
-      break;
-      
-    case LIST_POINTED_TO:
-      ans += ListPointedTo(x);
-      break;
-      
-    case LIST_ALIASES:
-      ans += ListAliases(x, NULL);
-      break;
+  // Loading and decoding the persistence file
+  pesqs->rebuild_eq_groups(fp);
+  pesqs->load_figures(fp, pesqs);
+  pesqs->profile_pestrie();
   
-    case LIST_ACC_VARS:
-      ans += ListModRefVars(x);
-      break;
-      
-    case LIST_CONFLICTS:
-      ans += ListConflicts(x);
-      break;
-    }
-  }
-
-  fprintf( stderr, "\nReference answer = %d\n", ans );
-  //delete[] queries;
-}
-
-int main( int argc, char** argv )
-{
-  if ( parse_options( argc, argv ) == false )
-    return -1;
-
-  srand( time(NULL) );
-  bitmap_obstack_initialize(NULL);
-
-  if ( read_index() == false ) return -1;
-  if ( do_profile ) profile_pestrie();
-
-  query_plan != NULL ? execute_query_plan() : traverse_result();
+  fprintf( stderr, "\n-------Input: %s-------\n", input_file );
+  show_res_use( "Index loading" );
   
-  char buf[128];
-  sprintf( buf, "%s querying", query_strs[query_type] );
-  show_res_use( buf );
-
-  return 0;
+  return pesqs;
 }

@@ -7,9 +7,9 @@
 #define OPTIONS_H
 
 #include "kvec.hh"
-//#include <vector>
-
 #define VECTOR(T) kvec_t(T)
+
+//#include <vector>
 //#define VECTOR(T) vector<T>
 
 

@@ -10,6 +10,33 @@
 
 using namespace std;
 
+// Accepts all pointers
+class AllAcceptFilter 
+  : public IFilter
+{
+public:
+  bool validate(int x) { return true; }
+};
+
+// Only accepts the base pointers
+class BasePtrFilter :
+  public IFilter
+{
+public:
+  bool validate(int x)
+  {
+    return valid_ptrs.find(x) != valid_ptrs.end();
+  }
+  
+  void add_ptr(int x)
+  {
+    valid_ptrs.insert(x);
+  }
+
+private:
+  set<int> valid_ptrs;
+};
+
 static const char* query_strs[] = {
   "random",
   "IsAlias",
@@ -20,26 +47,35 @@ static const char* query_strs[] = {
   "ListStores" 
 };
 
-static int query_type = IS_ALIAS;
-static bool do_profile = false;
-static bool print_answers = false;
-static bool trad_mode = false;
-static bool demand_merging = false;
+struct QueryOpts
+{
+  int query_type;
+  bool print_answers;
+  bool trad_mode;
+  bool demand_merging;
+  const char* input_file;
+  const char* query_plan;
 
-static const char* input_file = NULL;
-static const char* query_plan = NULL;
-static const char* check_file = NULL;
+  QueryOpts()
+  {
+    query_type = IS_ALIAS;
+    print_answers = false;
+    trad_mode = true;
+    demand_merging = false;
+    input_file = NULL;
+    query_plan = NULL;
+  }
+}
+query_opts;
 
 // Program options
 static void print_help( const char* prog_name )
 {
   printf( "Usage : %s [options] input_file [query_plan]\n", prog_name );
   printf( "Options  : \n" );
-  printf( "-c cfile : Perform sanity check by reconstructing the index with cfile.\n" );
   printf( "-p       : Print answer to the queries to stdout.\n" );
-  printf( "-g       : Profile the input index.\n" );
   printf( "-t [num] : Specify the query type:\n" );
-  printf( "    0    : randomly choose any of the following (default);\n" );
+  printf( "    0    : randomly choose any of the following queries (default);\n" );
   printf( "    1    : alias query\n" );
   printf( "    2    : list points-to\n" );
   printf( "    3    : list pointed-to\n" );
@@ -55,32 +91,27 @@ parse_options( int argc, char **argv )
 {
   int c;
 
-  while ( (c = getopt( argc, argv, "c:dgpst:h" ) ) != -1 ) {
+  while ( (c = getopt( argc, argv, "dpst:h" ) ) != -1 ) {
     switch ( c ) {
-    case 'c':
-      check_file = optarg;
-      break;
-
     case 'd':
-      demand_merging = true;
+      query_opts.demand_merging = true;
       break;
-            
-    case 'g':
-      do_profile = true;
-      break;
-
+      
     case 'p':
-      print_answers = true;
+      query_opts.print_answers = true;
       break;
 
     case 's':
-      trad_mode = true;
+      query_opts.trad_mode = true;
       break;
 
     case 't':
-      query_type = std::atoi( optarg );
-      if ( query_type < 0 || query_type > 9 )
-	query_type = QT_RANDOM;
+      {
+	int query_type = std::atoi( optarg );
+	if ( query_type < 0 || query_type > 9 )
+	  query_type = QT_RANDOM;
+	query_opts.query_type = query_type;
+      }
       break;
 
     case 'h':
@@ -99,19 +130,18 @@ parse_options( int argc, char **argv )
     return false;
   }
 
-  input_file = argv[optind];
-  query_plan = NULL;
-
+  query_opts.input_file = argv[optind];
+  
   ++optind;
   if ( optind < argc ) {
-    query_plan = argv[optind];
+    query_opts.query_plan = argv[optind];
   }
-
+  
   return true;
 }
 
 void
-execute_query_plan( BitQS *bitqs )
+execute_query_plan( IQuery *qs )
 {
   int x, y;
 
@@ -123,17 +153,14 @@ execute_query_plan( BitQS *bitqs )
 
   // Read the base pointers for query evaluation
   // We also aggregate the base pointers by their representatives
-  int n_es = bitqs->n_es;
   VECTOR(int) pointers;
-  VECTOR(int) *es2baseptrs = new VECTOR(int)[n_es];
+  BasePtrFilter* ptr_filter = new BasePtrFilter;
   
-  kv_init(int, pointers);
   while ( fscanf( fp, "%d", &x ) != EOF ) {
     pointers.push_back( x );
-    int es = bitqs->pt_map[x];
-    //if ( es > n_es ) printf( "%d\n", x );
+    int es = qs->getPtrEqID(x);
     if ( es != -1 )
-      es2baseptrs[es].push_back(x);
+      ptr_filter->add_ptr(x);
   }
   
   fclose( fp );
@@ -141,7 +168,6 @@ execute_query_plan( BitQS *bitqs )
   int n_query = pointers.size();
   //fprintf( stderr, "Query plan loaded : %d entries.\n", n_query );
   show_res_use( NULL );
-
 
   // Execute
   for ( int i = 0; i < n_query; ++i ) {
@@ -152,7 +178,7 @@ execute_query_plan( BitQS *bitqs )
 	// No difference in PesTrie case
 	for ( int j = i + 1; j < n_query; ++j ) {
 	  y = pointers[j];
-	  bool ans = IsAlias( bitqs, x, y );
+	  bool ans = qs->IsAlias( x, y );
 	  if ( print_answers )
 	    printf( "(%d, %d) : %s\n", x, y, ans == true ? "true" : "false" );
 	}
@@ -162,7 +188,7 @@ execute_query_plan( BitQS *bitqs )
     case LIST_POINTS_TO:
       {
 	x = pointers[i];
-	int ans = ListPointsTo( bitqs, x );
+	int ans = qs->ListPointsTo( x, ptr_filter );
 	if ( print_answers )
 	  printf( "%d : %d\n", x, ans );
       }
@@ -170,15 +196,7 @@ execute_query_plan( BitQS *bitqs )
       
     case LIST_ALIASES:
       {
-	int ans = 0;
-	
-	if ( trad_mode )
-	  ans = ListAliases_by_pointers( bitqs, i, pointers );
-	else {
-	  x = pointers[i];
-	  ans = ListAliases_by_representatives( bitqs, x, es2baseptrs );
-	}
-	
+	int ans = qs->ListAliases( i, ptr_filters );
 	if ( print_answers )
 	  printf( "%d : %d\n", x, ans );
       }
@@ -186,24 +204,26 @@ execute_query_plan( BitQS *bitqs )
     }
   }
 
-  delete[] es2baseptrs;
+  delete ptr_filters;
 }
 
 // We generate random pointers for evaluation
 void 
-traverse_result( BitQS *bitqs )
+traverse_result( IQuery *qs )
 {
   int x, y;
   int ans = 0;
 
+  int index_type = qs->get_query_type();
+
   if ( (index_type == PT_MATRIX && query_type >= LIST_ACC_VARS) ||
        (index_type == SE_MATRIX && query_type < LIST_ACC_VARS) ) {
-    fprintf( stderr, "The query commands are supported by input index file.\n" );
+    fprintf( stderr, "The query command is not supported by the input index file.\n" );
     return;
   }
 
-  int n = bitqs->n;
-  int m = bitqs->m;
+  int n = qs->n_of_ptrs();
+  int m = qs->n_of_objs();
   int n_query = ( query_type == LIST_POINTED_TO ? m : n );
 
   // We permute the pointers/objects
@@ -219,6 +239,8 @@ traverse_result( BitQS *bitqs )
   }
   */
 
+  AllAcceptFilter* ptr_filter = new AllAcceptFilter;
+
   for ( int i = 0; i < n_query; ++i ) {
     //x = queries[i];
     x = i;
@@ -226,78 +248,33 @@ traverse_result( BitQS *bitqs )
     switch ( query_type ) {
     case IS_ALIAS:
       y = n_query - x;
-      ans += (IsAlias( bitqs, x, y ) == true ? 1 : 0);
+      ans += (qs->IsAlias( x, y ) == true ? 1 : 0);
       break;
       
     case LIST_POINTS_TO:
-      ans += ListPointsTo( bitqs, x );
+      ans += qs->ListPointsTo( x, ptr_filter );
       break;
       
     case LIST_POINTED_TO:
-      ans += ListPointedTo( bitqs, x );
+      ans += qs->ListPointedTo( x, ptr_filter );
       break;
       
     case LIST_ALIASES:
-      ans += ListAliases_by_representatives( bitqs, x, NULL );
+      ans += qs->ListAliases( x, ptr_filter );
       break;
   
     case LIST_ACC_VARS:
-      ans += ans += ListModRefVars(bitqs, x);
+      ans += qs->ListModRefVars( x, ptr_filter );
       break;
       
     case LIST_CONFLICTS:
-      ans += ListConflicts(bitqs, x);
+      ans += qs->ListConflicts( x, ptr_filter );
       break;
     }
   }
   
   fprintf( stderr, "\nReference answer = %d\n", ans );
-  //delete[] queries;
-}
-
-// We rebuild the index currently
-static bool
-sanity_check( BitQS *bitqs )
-{
-  FILE *fp;
-  
-  fp = fopen( check_file, "r" );
-  if ( fp == NULL ) {
-    fprintf( stderr, "Loading verify file failed.\n" );
-    return false;
-  }
-
-  BitIndexer *indexer = parse_points_to_input( fp, 
-					       INPUT_START_BY_SIZE );
-  fclose( fp );
-  
-  indexer->fp_generate_index( indexer, true );
-  
-  // line by line compare
-  Cmatrix **mat_set_query = bitqs->qmats;
-  Cmatrix **mat_set_index = indexer->imats;
-  bool ret = true;
-
-  if ( matrix_equal_p( mat_set_query[I_PT_MATRIX],
-		       mat_set_index[I_PT_MATRIX] ) == true ) {
-    
-    if ( matrix_equal_p( mat_set_query[I_ALIAS_MATRIX],
-			 mat_set_index[I_ALIAS_MATRIX] ) == true ) {
-      fprintf( stderr, "Verify successfully.\n" );
-    }
-    else {
-      fprintf( stderr, "Verify alias matrix failed.\n" );
-      ret = false;
-    }
-  }
-  else {
-    fprintf( stderr, "Verify points-to matrix failed.\n" );
-    ret = false;
-  }
-
-  delete indexer;
-
-  return ret;
+  delete ptr_filer;
 }
 
 IQuery*
@@ -315,13 +292,13 @@ load_index()
   IQuery* qs = NULL;
 
   if ( strcmp( magic_code, BITMAP_PT_1 ) == 0)
-    qs = load_bitmap_index( fp, PT_MATRIX );
+    qs = load_bitmap_index( fp, PT_MATRIX, query_opts.trad_mode );
   else if ( strcmp( magic_code, BITMAP_SE_1 ) == 0 )
-    qs = load_bitmap_index( fp, SE_MATRIX );
+    qs = load_bitmap_index( fp, SE_MATRIX, query_opts.trad_mode );
   else if ( strcmp( magic_code, PESTRIE_PT_1 ) == 0)
-    qs = load_pestrie_index( fp, PT_MATRIX );
-  else if ( strcmp( magic_code, PESTRIE_SE_1 ) == 0 )
-    qs = load_pestrie_index( fp, SE_MATRIX );
+    qs = load_pestrie_index( fp, PT_MATRIX, query_opts.demand_merging );
+  else if ( strcmp( magic_code, PESTRIE_SE_1 ) == 0 )x
+    qs = load_pestrie_index( fp, SE_MATRIX, query_opts.demand_merging );
 
   fclose( fp );
 
@@ -338,20 +315,13 @@ int main( int argc, char** argv )
   if ( parse_options( argc, argv ) == 0 )
     return -1;
 
-  BitQS *bitqs = load_index();
-  if ( bitqs == NULL ) return -1;
-  if ( check_file != NULL &&
-       sanity_check( bitqs ) == false )
-    return -1;
+  IQuery *qs = load_index();
+  if ( qs == NULL ) return -1;
 
-  query_plan != NULL ? execute_query_plan(bitqs) : traverse_result(bitqs);
+  query_plan != NULL ? 
+    execute_query_plan(qs) : traverse_result(qs);
   
-  // if ( query_type == IS_ALIAS ) {
-  //   long total = (long)n_query * (n_query -1);
-  //   fprintf ( stderr, "Direct answers = %d, total = %lld\n", cnt_same_es, total/2 );
-  // }
-
-  delete bitqs;
+  delete qs;
 
   char buf[128];
   sprintf( buf, "%s querying (%s)", query_strs[query_type],

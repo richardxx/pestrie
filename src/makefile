@@ -55,10 +55,10 @@ pesI: pes-indexer.cc  $(BASIC_DEPS_H) $(PESTRIE_DEPS_H) $(PESTRIE_DEPS_C) $(BASI
 bitI: bit-indexer.cc $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(BITINDEX_DEPS_C) $(BITINDEX_DEPS_H)
 	$(CC) bit-indexer.cc $(BASIC_DEPS_C) $(BITINDEX_DEPS_C) $(CFLAGS) $(LIB) -o bitI
 
-pesQ: pes-querier.cc treap.hh kvec.hh histogram.hh query.h pes-querier.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
+pesQ: pes-querier.cc treap.hh kvec.hh histogram.hh query.hh pes-querier.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
 	$(CC) pes-querier.cc $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o pesQ
 
-bitQ: bit-querier.cc query.h $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix-ops.o
+bitQ: bit-querier.cc query.hh $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix-ops.o
 	$(CC) bit-querier.cc $(BITINDEX_DEPS_C) $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(CFLAGS) $(LIB) -o bitQ
 
 formatter: matrix-ops.hh matrix-ops.cc formatter.cc

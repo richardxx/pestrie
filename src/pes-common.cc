@@ -361,13 +361,13 @@ PesTrie::advanced_profile_pestrie()
  * The index file is in binary form and the format is shown below:
  * 
  * Magic Number (4 bytes)
- * N_p(pointer) N_o(object) N_vn(ES) N_f(#figures)
+ * N_p(pointer) N_o(object) N_vn(ES)
  * preV labels (N_p+N_o)
- * (Followed is a matrix of the figures)
- * n_bytes1, all the rectangles and points
+ * (Followed is a matrix of the figures. Line X is the group figures where X1 == X)
+ * n_bytes1, the labels of the figures where X1 = 1
  * n_bytes2, ....
  * .....
- * n_bytesk
+ * n_bytesk, ....
  */
 void 
 PesTrie::externalize_index( FILE* fp, const char* magic_number)
@@ -409,11 +409,15 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   }
   
   // We first output the quantity of the figures
+  /*
   int n_points = seg_tree->n_points;
   int n_vertis = seg_tree->n_vertis;
   int n_horizs = seg_tree->n_horizs;
   int n_rects = seg_tree->n_rects;
   int n_figures = n_points + n_vertis + n_horizs + n_rects;
+  // write N_f
+  fwrite( &n_figures, sizeof(int), 1, fp );
+  */
 
   // Now we start to output the index
   // Write the magic number
@@ -425,8 +429,6 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   fwrite( &m, sizeof(int), 1, fp );
   // Write N_vn
   fwrite( &vn, sizeof(int), 1, fp );
-  // write N_f
-  fwrite( &n_figures, sizeof(int), 1, fp );
   // Write the preV mappings for pointers+objects
   fwrite( pre_aux, sizeof(int), n + m, fp );
 
