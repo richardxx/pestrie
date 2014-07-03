@@ -13,7 +13,7 @@ ifndef INSTALL_DIR
 endif
 
 
-all: pesI bitI pesQ bitQ
+all: pesI bitI qtester
 
 
 obstack.o: obstack.cc
@@ -49,24 +49,30 @@ bit-pt.o : bit-pt.cc bit-index.hh
 bit-se.o : bit-se.cc bit-index.hh
 	$(CC) bit-se.cc $(CFLAGS) $(LIB) -c
 
+pes-querier.o : pes-querier.cc shapes.hh query.hh query-inl.hh options.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
+	$(CC) pes-querier.cc $(CFLAGS) $(LIB) -c
+
+bit-querier.o : bit-querier.cc query.hh query-inl.hh options.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
+	$(CC) bit-querier.cc $(CFLAGS) $(LIB) -c
+
 pesI: pes-indexer.cc  $(BASIC_DEPS_H) $(PESTRIE_DEPS_H) $(PESTRIE_DEPS_C) $(BASIC_DEPS_C)
 	$(CC) pes-indexer.cc $(PESTRIE_DEPS_C) $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o pesI
 
 bitI: bit-indexer.cc $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(BITINDEX_DEPS_C) $(BITINDEX_DEPS_H)
 	$(CC) bit-indexer.cc $(BASIC_DEPS_C) $(BITINDEX_DEPS_C) $(CFLAGS) $(LIB) -o bitI
 
-pesQ: pes-querier.cc treap.hh kvec.hh histogram.hh query.hh pes-querier.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
-	$(CC) pes-querier.cc $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o pesQ
+qtester: qtester.cc pes-querier.o bit-querier.o matrix-ops.o shapes.hh query.hh query-inl.hh options.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
+	$(CC) qtester.cc pes-querier.o bit-querier.o matrix-ops.o $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o qtester
 
-bitQ: bit-querier.cc query.hh $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix-ops.o
-	$(CC) bit-querier.cc $(BITINDEX_DEPS_C) $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(CFLAGS) $(LIB) -o bitQ
+#bitQ: bit-querier.cc query.hh $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix-ops.o
+#	$(CC) bit-querier.cc $(BITINDEX_DEPS_C) $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(CFLAGS) $(LIB) -o bitQ
 
 formatter: matrix-ops.hh matrix-ops.cc formatter.cc
 	$(CC) formatter.cc matrix-ops.o $(BASIC_DEPS_C) -o formatter
 
 install:
-	cp pesI bitI pesQ bitQ $(INSTALL_DIR)/bin
+	cp pesI bitI qtester $(INSTALL_DIR)/bin
 
 clean:
-	rm -f *.o pesI bitI pesQ bitQ formatter
+	rm -f *.o pesI bitI qtester formatter
 

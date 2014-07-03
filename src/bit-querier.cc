@@ -11,11 +11,11 @@
 #include <cstring>
 #include <vector>
 #include <set>
+#include "options.hh"
 #include "profile_helper.h"
 #include "matrix-ops.hh"
 #include "query.hh"
 #include "query-inl.hh"
-#include "options.hh"
 
 using namespace std;
 
@@ -24,17 +24,15 @@ class BitQS : public IQuery
 public:
   // Interface functions
   bool IsAlias( int x, int y);
-  int ListPointsTo( int x, const IFilter* filter );
-  int ListAliases( int x, const IFilter* filter );
-  int ListPointedBy( int o, const IFilter* filter );
-  int ListModRefVars( int x, const IFilter* filter );
-  int ListConflicts( int x, const IFilter* filter );
+  int ListPointsTo( int x, IFilter* filter );
+  int ListAliases( int x, IFilter* filter );
+  int ListPointedBy( int o, IFilter* filter );
+  int ListModRefVars( int x, IFilter* filter );
+  int ListConflicts( int x, IFilter* filter );
 
 public:
   int getPtrEqID(int x) { return pt_map[x]; }
   int getObjEqID(int x) { return obj_map[x]; }
-
-public:
   int nOfPtrs() { return n; }
   int nOfObjs() { return m; }
   int getIndexType() { return index_type; }
@@ -84,6 +82,10 @@ public:
   void load_pt_index( FILE *fp );
   void load_se_index( FILE *fp );
   void rebuild_eq_groups();
+
+private:
+  int ListStores( int x, IFilter* filter );
+  int ListLoads( int x, IFilter* filter );
 
 private:
   // Input matrices
@@ -243,7 +245,7 @@ BitQS::IsAlias( int x, int y )
 }
 
 int 
-BitQS::ListPointsTo( int x )
+BitQS::ListPointsTo( int x, IFilter* filter )
 {
   int ans = 0;
   unsigned o;
@@ -255,7 +257,7 @@ BitQS::ListPointsTo( int x )
     bitmap ptx = qmats[I_PT_MATRIX]->at(x);
     EXECUTE_IF_SET_IN_BITMAP( ptx, 0, o, bi ) {
       VECTOR(int) *objs = &es2objs[o];
-      ans += iterate_equivalent_set( objs );
+      ans += iterate_equivalent_set( objs, filter );
     }
   }
 
@@ -263,7 +265,7 @@ BitQS::ListPointsTo( int x )
 }
 
 int 
-BitQS::ListPointedTo( int o, const IFilter* filter )
+BitQS::ListPointedBy( int o, IFilter* filter )
 {
   int ans = 0;
   unsigned p;
@@ -274,7 +276,7 @@ BitQS::ListPointedTo( int o, const IFilter* filter )
   if ( o != -1 ) {
     bitmap pto = qmats[I_PTED_MATRIX]->at(o);
     EXECUTE_IF_SET_IN_BITMAP( pto, 0, p, bi ) {
-      VECTOR(int) *ptrs = &es2pointers[p];
+      VECTOR(int) *ptrs = &es2ptrs[p];
       ans += iterate_equivalent_set( ptrs, filter );
     }
   }
@@ -283,7 +285,7 @@ BitQS::ListPointedTo( int o, const IFilter* filter )
 }
 
 int 
-BitQS::ListAliases( int x, const IFilter* filter )
+BitQS::ListAliases( int x, IFilter* filter )
 {
   int ans = 0;
   unsigned q, o;
@@ -314,7 +316,7 @@ BitQS::ListAliases( int x, const IFilter* filter )
     
     // Extract the base pointers as the answer
     EXECUTE_IF_SET_IN_BITMAP( res, 0, q, bi ) {
-      VECTOR(int) *ptrs = &es2pointers[q];
+      VECTOR(int) *ptrs = &es2ptrs[q];
       ans += iterate_equivalent_set( ptrs, filter );
     }
   }
@@ -371,7 +373,7 @@ ListAliases_by_pointers( BitQS *bitqs, int i, VECTOR(int) &pointers )
 */
 
 int 
-BitQS::ListModRefVars( int x, const IFilter* filter )
+BitQS::ListModRefVars( int x, IFilter* filter )
 {
   int ans = 0;
   unsigned o;
@@ -394,7 +396,7 @@ BitQS::ListModRefVars( int x, const IFilter* filter )
 }
 
 int
-BitQS::ListLoads( int x, const IFilter* filter )
+BitQS::ListLoads( int x, IFilter* filter )
 {
   int ans = 0;
   unsigned v;
@@ -420,7 +422,7 @@ BitQS::ListLoads( int x, const IFilter* filter )
 
   // visit
   EXECUTE_IF_SET_IN_BITMAP( res_other, 0, v, bi ) {
-    VECTOR(int) *stores = &es2pointers[v];
+    VECTOR(int) *stores = &es2ptrs[v];
     ans += iterate_equivalent_set( stores, filter );
   }
   
@@ -428,7 +430,7 @@ BitQS::ListLoads( int x, const IFilter* filter )
 }
 
 int
-BitQS::ListStores( int x, const IFilter* filter )
+BitQS::ListStores( int x, IFilter* filter )
 {
   int ans = 0;
   unsigned v;
@@ -451,7 +453,7 @@ BitQS::ListStores( int x, const IFilter* filter )
   }
   
   EXECUTE_IF_SET_IN_BITMAP( res_other, 0, v, bi ) {
-    VECTOR(int) *stmts = &es2pointers[v+n_st];
+    VECTOR(int) *stmts = &es2ptrs[v+n_st];
     ans += iterate_equivalent_set( stmts, filter );
   }
 
@@ -469,7 +471,7 @@ BitQS::ListStores( int x, const IFilter* filter )
   }
   
   EXECUTE_IF_SET_IN_BITMAP( res_self, 0, v, bi ) {
-    VECTOR(int) *stmts = &es2pointers[v];
+    VECTOR(int) *stmts = &es2ptrs[v];
     ans += iterate_equivalent_set( stmts, filter );
   }
 
@@ -477,14 +479,14 @@ BitQS::ListStores( int x, const IFilter* filter )
 }
 
 int
-BitQS::ListConflicts( int x, const IFilter* filter )
+BitQS::ListConflicts( int x, IFilter* filter )
 {
-  int xx = bitqs->pt_map[x];
+  int xx = pt_map[x];
   if ( xx == -1 ) return 0;
 
   int ans = 0;
 
-  if ( xx < bitqs->n_st ) { 
+  if ( xx < n_st ) { 
     // Store
     ans = ListStores( x, filter );
   }
@@ -545,11 +547,10 @@ BitQS::sanity_check( const char* check_file )
 */
 
 
-BitQS*
+IQuery*
 load_bitmap_index( FILE* fp, int index_type, bool t_mode )
 {
   __init_matrix_lib();
-  fprintf( stderr, "\n-------Input: %s-------\n", input_file );
   
   // Load header info
   int n, m;
@@ -564,8 +565,6 @@ load_bitmap_index( FILE* fp, int index_type, bool t_mode )
   else
     bitqs->load_se_index( fp );
 
-  bitqs->rebuid_eq_groups();
-  
-  show_res_use( "Index loading" );
+  bitqs->rebuild_eq_groups();
   return bitqs;
 }

@@ -24,6 +24,7 @@
 // Querying result filter
 class IFilter
 {
+public:
   // Keep x or not?
   virtual bool validate(int x) = 0;
 };
@@ -37,19 +38,19 @@ public:
   virtual bool IsAlias( int x, int y ) = 0;
 
   // Test if x points to o
-  virtual ListPointsTo( int x, const IFilter* filter ) = 0;
+  virtual int ListPointsTo( int x, IFilter* filter ) = 0;
 
   // Show all the pointers in ptrs that are alias to x
-  virtual int ListAliases( int x, const IFilter* filter ) = 0;
+  virtual int ListAliases( int x, IFilter* filter ) = 0;
 
   // Show all the pointers that point to o
-  virtual int ListPointedBy( int o, const IFilter* filter ) = 0;
+  virtual int ListPointedBy( int o, IFilter* filter ) = 0;
 
   // Show all the variables that modify or read by statement x
-  virtual int ListModRefVars( int x, const IFilter* filter ) = 0;
+  virtual int ListModRefVars( int x, IFilter* filter ) = 0;
 
   // Show all the statements that read/write conflict to x 
-  virtual int ListConflicts( int x, const IFilter* filter ) = 0;
+  virtual int ListConflicts( int x, IFilter* filter ) = 0;
 
 public:
   virtual int getPtrEqID(int x);

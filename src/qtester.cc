@@ -3,10 +3,13 @@
  *
  */
 
-#include "query.hh"
 #include <unistd.h>
 #include <cstdlib>
 #include <cstdio>
+#include <set>
+#include "options.hh"
+#include "query.hh"
+#include "profile_helper.h"
 
 using namespace std;
 
@@ -145,7 +148,7 @@ execute_query_plan( IQuery *qs )
 {
   int x, y;
 
-  FILE *fp = fopen( query_plan, "r" );
+  FILE *fp = fopen( query_opts.query_plan, "r" );
   if ( fp == NULL ) {
     fprintf( stderr, "Cannot open the query plan file. Simulation exits.\n" );
     return;
@@ -171,7 +174,7 @@ execute_query_plan( IQuery *qs )
 
   // Execute
   for ( int i = 0; i < n_query; ++i ) {
-    switch ( query_type ) {
+    switch ( query_opts.query_type ) {
     case IS_ALIAS:
       {
 	x = pointers[i];
@@ -179,7 +182,7 @@ execute_query_plan( IQuery *qs )
 	for ( int j = i + 1; j < n_query; ++j ) {
 	  y = pointers[j];
 	  bool ans = qs->IsAlias( x, y );
-	  if ( print_answers )
+	  if ( query_opts.print_answers )
 	    printf( "(%d, %d) : %s\n", x, y, ans == true ? "true" : "false" );
 	}
       }
@@ -189,22 +192,22 @@ execute_query_plan( IQuery *qs )
       {
 	x = pointers[i];
 	int ans = qs->ListPointsTo( x, ptr_filter );
-	if ( print_answers )
+	if ( query_opts.print_answers )
 	  printf( "%d : %d\n", x, ans );
       }
       break;
       
     case LIST_ALIASES:
       {
-	int ans = qs->ListAliases( i, ptr_filters );
-	if ( print_answers )
+	int ans = qs->ListAliases( i, ptr_filter );
+	if ( query_opts.print_answers )
 	  printf( "%d : %d\n", x, ans );
       }
       break;
     }
   }
 
-  delete ptr_filters;
+  delete ptr_filter;
 }
 
 // We generate random pointers for evaluation
@@ -214,17 +217,17 @@ traverse_result( IQuery *qs )
   int x, y;
   int ans = 0;
 
-  int index_type = qs->get_query_type();
+  int index_type = qs->getIndexType();
 
-  if ( (index_type == PT_MATRIX && query_type >= LIST_ACC_VARS) ||
-       (index_type == SE_MATRIX && query_type < LIST_ACC_VARS) ) {
+  if ( (index_type == PT_MATRIX && query_opts.query_type >= LIST_ACC_VARS) ||
+       (index_type == SE_MATRIX && query_opts.query_type < LIST_ACC_VARS) ) {
     fprintf( stderr, "The query command is not supported by the input index file.\n" );
     return;
   }
 
-  int n = qs->n_of_ptrs();
-  int m = qs->n_of_objs();
-  int n_query = ( query_type == LIST_POINTED_TO ? m : n );
+  int n = qs->nOfPtrs();
+  int m = qs->nOfObjs();
+  int n_query = ( query_opts.query_type == LIST_POINTED_TO ? m : n );
 
   // We permute the pointers/objects
   /*
@@ -245,7 +248,7 @@ traverse_result( IQuery *qs )
     //x = queries[i];
     x = i;
 
-    switch ( query_type ) {
+    switch ( query_opts.query_type ) {
     case IS_ALIAS:
       y = n_query - x;
       ans += (qs->IsAlias( x, y ) == true ? 1 : 0);
@@ -256,7 +259,7 @@ traverse_result( IQuery *qs )
       break;
       
     case LIST_POINTED_TO:
-      ans += qs->ListPointedTo( x, ptr_filter );
+      ans += qs->ListPointedBy( x, ptr_filter );
       break;
       
     case LIST_ALIASES:
@@ -274,13 +277,13 @@ traverse_result( IQuery *qs )
   }
   
   fprintf( stderr, "\nReference answer = %d\n", ans );
-  delete ptr_filer;
+  delete ptr_filter;
 }
 
 IQuery*
 load_index()
 {
-  FILE *fp = fopen( input_file, "rb" );
+  FILE *fp = fopen( query_opts.input_file, "rb" );
   if ( fp == NULL ) return NULL;
 
   // We first validate the index file
@@ -297,7 +300,7 @@ load_index()
     qs = load_bitmap_index( fp, SE_MATRIX, query_opts.trad_mode );
   else if ( strcmp( magic_code, PESTRIE_PT_1 ) == 0)
     qs = load_pestrie_index( fp, PT_MATRIX, query_opts.demand_merging );
-  else if ( strcmp( magic_code, PESTRIE_SE_1 ) == 0 )x
+  else if ( strcmp( magic_code, PESTRIE_SE_1 ) == 0 )
     qs = load_pestrie_index( fp, SE_MATRIX, query_opts.demand_merging );
 
   fclose( fp );
@@ -306,7 +309,9 @@ load_index()
     fprintf( stderr, "This is an INVALID index file.\n" );    
     return NULL;
   }
-  
+
+  fprintf( stderr, "\n-------Input: %s-------\n", query_opts.input_file );
+  show_res_use( "Index loading" );
   return qs;
 }
 
@@ -318,14 +323,14 @@ int main( int argc, char** argv )
   IQuery *qs = load_index();
   if ( qs == NULL ) return -1;
 
-  query_plan != NULL ? 
+  query_opts.query_plan != NULL ? 
     execute_query_plan(qs) : traverse_result(qs);
   
   delete qs;
 
   char buf[128];
-  sprintf( buf, "%s querying (%s)", query_strs[query_type],
-	   trad_mode == true ? "on-demand" : "use-index" );
+  sprintf( buf, "%s querying (%s)", query_strs[query_opts.query_type],
+	   query_opts.trad_mode == true ? "on-demand" : "use-index" );
   show_res_use( buf );
 
   return 0;
