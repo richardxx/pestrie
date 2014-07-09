@@ -219,19 +219,23 @@ void PesTrie::profile_index()
   int n_rects = seg_tree->n_rects;
   int n_total_stored = n_points + n_vertis + n_horizs + n_rects;
 
-  fprintf( stderr, "\n----------Pestrie Index--------------\n" );
-  fprintf( stderr, "We totally generate %d rectangles, %d of them are indexed.\n", 
+  fprintf( stderr, "\n------------Pestrie Index--------------\n" );
+  fprintf( stderr, "We totally generate %d figures, %d of them are indexed.\n", 
 	   n_gen_rects, n_total_stored );
 
-  fprintf( stderr, "\t %d vertical lines, percentage = %.2lf\%\n", 
+  fprintf( stderr, "-->%d rectangles, percentage = %.2lf\%\n", 
+	   n_rects, 
+	   (double)(n_rects) / n_total_stored * 100 );
+
+  fprintf( stderr, "-->%d vertical lines, percentage = %.2lf\%\n", 
 	   n_vertis, 
 	   (double)(n_vertis) / n_total_stored * 100 );
 
-  fprintf( stderr, "\t %d horizontal lines, percentage = %.2lf\%\n", 
+  fprintf( stderr, "-->%d horizontal lines, percentage = %.2lf\%\n", 
 	   n_horizs,
 	   (double)(n_horizs) / n_total_stored * 100 );
 
-  fprintf( stderr, "\t %d points, percentage = %.2lf\%\n", 
+  fprintf( stderr, "-->%d points, percentage = %.2lf\%\n", 
 	   n_points,
 	   (double)(n_points) / n_total_stored * 100 );
 
@@ -376,15 +380,16 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   int m = this->m;
   int cm = this->cm;
   int vn = this->vn;
-  MatrixRow *r_order = this->r_order;
   int *m_rep = this->m_rep;
   int *preV = this->preV;
   int *bl = this->bl;
+  MatrixRow *r_order = this->r_order;
   SegTree* seg_tree = this->seg_tree;
 
   // Fill up the preV mapping for input pointers and objects
   int *pre_aux = new int[n+m];
- 
+  int *obj_pos = new int[cm];
+
   // First are the pointers
   for ( int i = 0; i < n; ++i ) {
     int x = bl[i];
@@ -393,7 +398,6 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   }
 
   // Second are the objects
-  int *obj_pos = new int[cm];
   for ( int i = 0; i < cm; ++i ) {
     int j = r_order[i].id;
     obj_pos[j] = i;
@@ -408,17 +412,6 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
     pre_aux[i+n] = ( k == -1 ? -1 : preV[k] );   
   }
   
-  // We first output the quantity of the figures
-  /*
-  int n_points = seg_tree->n_points;
-  int n_vertis = seg_tree->n_vertis;
-  int n_horizs = seg_tree->n_horizs;
-  int n_rects = seg_tree->n_rects;
-  int n_figures = n_points + n_vertis + n_horizs + n_rects;
-  // write N_f
-  fwrite( &n_figures, sizeof(int), 1, fp );
-  */
-
   // Now we start to output the index
   // Write the magic number
   fwrite( magic_number, sizeof(char), 4, fp );
@@ -432,13 +425,14 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   // Write the preV mappings for pointers+objects
   fwrite( pre_aux, sizeof(int), n + m, fp );
 
+  int n_labels = 3 + n + m;
+
   // Write the figures
-  flush_left_shapes( seg_tree );
-  int n_labels = dump_figures( seg_tree, fp );
+  seg_tree->flush_left_shapes();
+  n_labels += seg_tree->dump_figures( fp );
 
   // Estimate the index size (almost real)
   double intsize = sizeof(int);
-  n_labels += 3 + n + m;
   fprintf( stderr, "Index labels : %d\n", n_labels );
   fprintf( stderr, "The PesTrie index size is : %.0lfKb\n", n_labels * intsize / 1024 );
 

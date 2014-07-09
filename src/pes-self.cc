@@ -156,7 +156,7 @@ PesTrieSelf::build_index()
 	p -> start = lastV[ tree_edges[p->t][p->start] ];
       }
       r.x2 = p->start;
-      insert_segtree_wrapper( seg_tree, r );
+      seg_tree->insert_segtree(r);
       
       ++n_gen_rects;
 
@@ -203,8 +203,8 @@ PesTrieSelf::build_index()
 	      r.y1 = preV[ q->t ];
 	      r.y2 = q->start;
 	      // Insert
-	      if ( query_point( seg_tree, r.x1, r.y1 ) == false ) {
-		insert_segtree_wrapper( seg_tree, r );
+	      if ( seg_tree->query_point( r.x1, r.y1 ) == false ) {
+		seg_tree->insert_segtree( r );
 	      }
 	      ++n_gen_rects;
 	      q = q -> next;

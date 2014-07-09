@@ -3,9 +3,16 @@
  * By richardxx, 2012.9
  */
 #include "treap.hh"
+#include <cstdlib>
 
 using namespace std;
 
+TreapNode::TreapNode( VLine *r )
+{
+  data = r;
+  rkey = std::rand();
+  left = right = NULL;
+}
 
 static struct TreapNode* 
 rotate_left( struct TreapNode *p )
@@ -64,8 +71,9 @@ remove_node( TreapNode* p )
 
 // -------------------------------------------------------
 
-// A Non-recursive procedure to find the position where a new segment lives in
-VLine* find_treap( struct TreapNode *p, int y )
+// A Non-recursive procedure to find the nearest figure below y
+struct VLine* 
+find_treap( struct TreapNode *p, int y )
 {
   int diff;
   struct TreapNode *ans = NULL;
@@ -128,6 +136,22 @@ remove_treap( struct TreapNode* p, int y )
   
   return p;
 }
+
+// Inorder traversal of treap and collect the figures
+void 
+inorder_treap( TreapNode *p, VECTOR(VLine*) &collector )
+{
+  if ( p == NULL ) return;
+  
+  if ( p->left != NULL )
+    inorder_treap( p->left, collector );
+  
+  collector.push_back(p->data);
+  
+  if ( p->right != NULL )
+    inorder_treap( p->right, collector );
+}
+
 
 void
 clean_treap( struct TreapNode* p )

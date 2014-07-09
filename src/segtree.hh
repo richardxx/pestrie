@@ -25,34 +25,37 @@ struct SegTreeNode
   {
     clean_treap(rects);
   }
+
+public:
+  bool collect_figures( VECTOR(VLine*)& );
 };
 
 // The segment tree and its statistical information
 struct SegTree
 {
   int maxN;
-  SegTreeNode **unitRoots;
+  SegTreeNode **unitNodes;
   int n_points, n_horizs, n_vertis, n_rects;
   int n_pairs;
 
   SegTree( int );
   ~SegTree();
+
+public:
+  bool query_point( int, int );
+  void insert_segtree( const Rectangle& );
+  void flush_left_shapes();
+  int dump_figures( std::FILE* );
+
+private:
+  void insert_rectangle( int, int, VLine* );
+  SegTreeNode* get_unit_node(int);
+  void insert_unit_node(int, VLine*);
 };
 
-//
+// Construct a segment tree instance
 SegTree* 
-build_segtree( int, int);
+build_segtree( int, int );
 
-bool
-query_point( SegTree*, int, int );
-
-void
-insert_segtree_wrapper( SegTree*, const Rectangle& );
-
-int
-dump_figures( SegTree*, std::FILE* fp );
-
-void
-flush_left_shapes( SegTree* );
 
 #endif

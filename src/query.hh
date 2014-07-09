@@ -53,10 +53,8 @@ public:
   virtual int ListConflicts( int x, IFilter* filter ) = 0;
 
 public:
-  virtual int getPtrEqID(int x);
-  virtual int getObjEqID(int x);
-
-public:
+  virtual int getPtrEqID(int x) = 0;
+  virtual int getObjEqID(int x) = 0;
   virtual int nOfPtrs() = 0;
   virtual int nOfObjs() = 0;
   virtual int getIndexType() = 0;

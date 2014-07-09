@@ -8,8 +8,6 @@
 #ifndef SHAPE_H
 #define SHAPE_H
 
-#include "options.hh"
-
 const int SIG_POINT = 0;
 const int SIG_VERTICAL = 0x40000000;
 const int SIG_HORIZONTAL = 0x80000000;
@@ -77,7 +75,8 @@ struct Rectangle : public VLine
     y2 = Y2;
   }
 
-  Rectangle( const Rectangle& other ) {
+  Rectangle( const Rectangle& other ) 
+  {
     *this = other;
   }
 

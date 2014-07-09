@@ -14,11 +14,12 @@
 #include <algorithm>
 #include <ctime>
 #include <set>
+#include "options.hh"
 #include "shapes.hh"
-#include "profile_helper.h"
 //#include "bitmap.h"
 #include "query.hh"
 #include "query-inl.hh"
+#include "profile_helper.h"
 
 using namespace std;
 
@@ -61,6 +62,7 @@ public:
   {
     segUnits = new SegNode*[maxN];
     segRoot = build_seg_tree(0, maxN-1);
+    n_range = maxN;
   }
 
   ~SegTree()
@@ -69,10 +71,13 @@ public:
     free_seg_tree( segRoot );
   }
 
+  SegNode* get_unit_node( int x ) 
+  { 
+    return segUnits[x]; 
+  }
+
   void optimize_seg_tree();
   void recursive_merge( SegNode* p );
-  SegNode* get_unit_node( int x ) { return segUnits[x]; }
-
   void insert_point( int x, int y );
   void insert_point( int x, VLine* p );
   void insert_rect( int x1, int x2, VLine* pr );
@@ -80,12 +85,16 @@ public:
 private:
   SegNode* build_seg_tree( int l, int r );
   void free_seg_tree( SegNode* );
-  void internal_insert_rect( int x1, int x2, VLine* pr, SegNode* p );
-  void internal_opt_seg_tree( SegNode* p );
+  void __insert_rect( int x1, int x2, VLine* pr, SegNode* p );
+  void __opt_seg_tree( SegNode* p );
   
 private:
-  // The querying segment tree
-  SegNode **segUnits, *segRoot;
+  // The pointers to the unit nodes
+  SegNode **segUnits;
+  // The pointer to the root
+  SegNode *segRoot;
+  // The range of X-aixs
+  int n_range;
 };
 
 
@@ -132,7 +141,7 @@ SegTree::free_seg_tree( SegNode* p )
  * We update the parent links to skip the empty nodes.
  */ 
 void
-SegTree::internal_opt_seg_tree( SegNode* p ) 
+SegTree::__opt_seg_tree( SegNode* p ) 
 {
   SegNode* q = p->parent;
   
@@ -146,17 +155,23 @@ SegTree::internal_opt_seg_tree( SegNode* p )
     p->merged = true;
 
   if ( p->left != NULL )
-    internal_opt_seg_tree( p->left );
+    __opt_seg_tree( p->left );
   if ( p->right != NULL )
-    internal_opt_seg_tree( p->right );
+    __opt_seg_tree( p->right );
 }
 
 void
 SegTree::optimize_seg_tree()
 {
-  internal_opt_seg_tree( segRoot );
-}
+  __opt_seg_tree( segRoot );
 
+  // We also optimize the unit pointers
+  for ( int i = 0; i < n_range; ++i ) {
+    SegNode* p = segUnits[i];
+    if ( p->n_of_rects() == 0 )
+      segUnits[i] = p->parent;
+  }
+}
 
 // We do merging sort
 void
@@ -171,7 +186,7 @@ SegTree::recursive_merge( SegNode* p )
   int sz2 = p->rects.size();
 
   if ( sz1 != 0 ) {
-    // We have something to merge top down
+    // We have something to merge from top down
     VECTOR(VLine*) &list3 = p->rects;
     if ( sz2 == 0 ) {
       // Fast path, just copy
@@ -225,7 +240,7 @@ SegTree::insert_point( int x, VLine* p )
  * [x1, x2]: the X range of the rectangle for insersion
  */
 void
-SegTree::internal_insert_rect( int x1, int x2, VLine* pr, SegNode* p )
+SegTree::__insert_rect( int x1, int x2, VLine* pr, SegNode* p )
 {
   if ( x1 <= p->l && x2 >= p->r ) {
     // We only consider the full coverage
@@ -234,14 +249,14 @@ SegTree::internal_insert_rect( int x1, int x2, VLine* pr, SegNode* p )
   }
 
   int x = (p->l + p->r) / 2;  
-  if ( x1 <= x ) internal_insert_rect( x1, x2, pr, p->left );
-  if ( x2 > x ) internal_insert_rect( x1, x2, pr, p->right );
+  if ( x1 <= x ) __insert_rect( x1, x2, pr, p->left );
+  if ( x2 > x ) __insert_rect( x1, x2, pr, p->right );
 }
 
 void
 SegTree::insert_rect( int x1, int x2, VLine* pr )
 {
-  internal_insert_rect( x1, x2, pr, segRoot );
+  __insert_rect( x1, x2, pr, segRoot );
 }
 
 
@@ -260,13 +275,13 @@ public:
 public:
   int getPtrEqID(int x) { return preV[x]; }
   int getObjEqID(int x) { return preV[x+n]; }
-  void load_figures( FILE* fp );
-  void profile_pestrie();
-
-public:
   int nOfPtrs() { return n; }
   int nOfObjs() { return m; }
   int getIndexType() { return index_type; }
+
+public:
+  void load_figures( FILE* fp );
+  void profile_pestrie();
 
 public:
   PesQS(int n_ptrs, int n_objs, int n_vertex, int type, int d_merging)
@@ -280,14 +295,24 @@ public:
     root_prevs = new int[n_objs+1];
     root_tree = new int[n_vertex+1];
     es2ptrs = new VECTOR(int)[n_vertex];
-    
+    qtree = new SegTree(n_vertex);
+
     if ( type == PT_MATRIX ) {
       es2objs = new VECTOR(int)[n_vertex];
-    }
-
-    qtree = new SegTree(n_vertex);
+    }    
   }
-  
+
+  ~PesQS()
+  {
+    delete[] tree;
+    delete[] preV;
+    delete[] root_prevs;
+    delete[] root_tree;
+    delete[] es2ptrs;
+    delete qtree;
+    if ( index_type == PT_MATRIX ) delete es2objs;
+  }
+
 public:
   void rebuild_eq_groups( FILE* fp );
   
@@ -390,9 +415,8 @@ PesQS::rebuild_eq_groups( FILE* fp )
   }
 }
 
-
 static bool 
-comp_rect( VLine* r1, VLine* r2 )
+comp_rect( Rectangle* r1, Rectangle* r2 )
 {
   return r1->y1 < r2->y1;
 }
@@ -400,6 +424,7 @@ comp_rect( VLine* r1, VLine* r2 )
 void
 PesQS::load_figures( FILE* fp )
 {
+  int n_points = 0, n_horizs = 0, n_vertis = 0, n_rects = 0;
   int n_labels;
   int *labels = new int[vertex_num * 3];
   VECTOR(Rectangle*) all_rects(vertex_num);
@@ -419,6 +444,7 @@ PesQS::load_figures( FILE* fp )
 	// This is a point, directly insert it
 	qtree->insert_point( x1, y1 );
 	qtree->insert_point( y1, x1 );
+	++n_points;
 	continue;
       }
 
@@ -426,33 +452,38 @@ PesQS::load_figures( FILE* fp )
 	y1 &= ~SIG_VERTICAL;
 	y2 = labels[i++];
 	x2 = x1;
+	++n_vertis;
       }
       else if ( (y1&SIG_FIGURE) == SIG_HORIZONTAL ) {
 	y1 &= ~SIG_HORIZONTAL;
 	x2 = labels[i++];
 	y2 = y1;
+	++n_horizs;
       }
       else {
 	y1 &= ~SIG_RECT;
 	x2 = labels[i++];
 	y2 = labels[i++];
+	++n_rects;
       }
 
-      // First, insert the reversed figure directly
+      // First, insert the reversed figure 
+      // (must insert before original figure)
       VLine* p = new VLine(x1, x2);
       if ( y1 == y2 ) {
 	qtree->insert_point(y1, p);
       }
       else {
-	qtree->insert_rect( y1, y2, p );
+	qtree->insert_rect(y1, y2, p);
       }
 
       // Second, we cache the original figure
-      Rectangle* r = new Rectangle(x1, x2, y1, y2);
       if ( x1 == x2 ) {
-	qtree->insert_point(x1, r);
+	p = new VLine(y1, y2);
+	qtree->insert_point(x1, p);
       }
       else {
+	Rectangle* r = new Rectangle(x1, x2, y1, y2);
 	all_rects.push_back(r);
       }
     }
@@ -471,6 +502,11 @@ PesQS::load_figures( FILE* fp )
   // Optimize the parent links
   qtree->optimize_seg_tree();
   delete[] labels;
+
+  fprintf( stderr, "--------Figures--------\n" );
+  fprintf( stderr, 
+	   "Points = %d, Verticals = %d, Horizontals = %d, Rectangles = %d\n",
+	   n_points, n_vertis, n_horizs, n_rects );
 }
 
 void 
@@ -479,8 +515,7 @@ PesQS::profile_pestrie()
   int non_empty_nodes = 0;
 
   for ( int i = 0; i < vertex_num; ++i ) {
-    // Test 1:
-    VECTOR(int) ptrs = es2ptrs[i];
+    VECTOR(int) &ptrs = es2ptrs[i];
     if ( ptrs.size() > 0 )
       ++non_empty_nodes;
   }
@@ -576,9 +611,8 @@ PesQS::ListPointsTo( int x, IFilter* filter )
   int tr = tree[x];
   if ( tr == -1 ) return 0;
   
-  // Don't forget x -> tree[x]
-  objs = &es2objs[tr];
-  ans += iterate_equivalent_set( objs, filter );
+  // Don't forget x points-to tree[x]
+  ans += iterate_equivalent_set( es2objs[tr], filter );
   
   x = preV[x];
   p = qtree->get_unit_node(x);
@@ -590,10 +624,6 @@ PesQS::ListPointsTo( int x, IFilter* filter )
 int 
 PesQS::ListAliases( int x, IFilter* filter )
 {
-  SegNode *p;
-  VLine *r;
-  int size;
-
   int tr = tree[x];
   if ( tr == -1 ) return 0;
   
@@ -601,18 +631,8 @@ PesQS::ListAliases( int x, IFilter* filter )
   x = preV[x];
 
 #define VISIT_POINT(v)							\
-  ans += iterate_equivalent_set( es2ptrs + v, filter );			
+  ans += iterate_equivalent_set( es2ptrs[v], filter );			
   
-#define VISIT_RECT(r)							\
-  do {									\
-    int lower = r->y1;							\
-    int upper = r->y2;							\
-    do {								\
-      VISIT_POINT(lower);						\
-      ++lower;								\
-    } while ( lower <= upper );						\
-  } while(0)
-
   // We first extract the ES groups that belong to the same subtree
   {
     int upper = root_prevs[tr+1];
@@ -621,15 +641,20 @@ PesQS::ListAliases( int x, IFilter* filter )
     }
   }
 
-  p = qtree->get_unit_node(x);
+  SegNode *p = qtree->get_unit_node(x);
 
   // traverse the rectangles up the tree
   while ( p != NULL ) {
     VECTOR(VLine*) &rects = p->rects;
-    size = rects.size();
+    int size = rects.size();
     for ( int i = 0; i < size; ++i ) {
-      r = rects[i];
-      VISIT_RECT(r);
+      VLine *r = rects[i];
+      int lower = r->y1;						
+      int upper = r->y2;						
+      do {							
+	VISIT_POINT(lower);					
+	++lower;							
+      } while ( lower <= upper );					
     }
     p = p->parent;
   }
@@ -676,7 +701,7 @@ load_pestrie_index(FILE* fp, int index_type, bool d_merging )
   // Loading and decoding the persistence file
   pesqs->rebuild_eq_groups(fp);
   pesqs->load_figures(fp);
-  //pesqs->profile_pestrie();
+  pesqs->profile_pestrie();
   
   return pesqs;
 }

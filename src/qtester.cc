@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <cstdio>
-#include <set>
+#include <algorithm>
 #include "options.hh"
 #include "query.hh"
 #include "profile_helper.h"
@@ -22,22 +22,42 @@ public:
 };
 
 // Only accepts the base pointers
+// Note: one can customize filter implementation for Bitmap and Pestrie and gain better performance
 class BasePtrFilter :
   public IFilter
 {
 public:
   bool validate(int x)
   {
-    return valid_ptrs.find(x) != valid_ptrs.end();
+    int s = 0, e = valid_ptrs.size();
+    int mid;
+    
+    while ( s < e ) {
+      mid = (s+e) / 2;
+      int xx = valid_ptrs[mid];
+      
+      if ( xx == x ) return true;
+      if ( xx < x )
+	s = mid + 1;
+      else
+	e = mid;
+    }
+
+    return false;
   }
   
   void add_ptr(int x)
   {
-    valid_ptrs.insert(x);
+    valid_ptrs.push_back(x);
+  }
+
+  void finalize()
+  {
+    sort( valid_ptrs.begin(), valid_ptrs.end() );
   }
 
 private:
-  set<int> valid_ptrs;
+  VECTOR(int) valid_ptrs;
 };
 
 static const char* query_strs[] = {
@@ -63,7 +83,7 @@ struct QueryOpts
   {
     query_type = IS_ALIAS;
     print_answers = false;
-    trad_mode = true;
+    trad_mode = false;
     demand_merging = false;
     input_file = NULL;
     query_plan = NULL;
@@ -161,18 +181,15 @@ execute_query_plan( IQuery *qs )
   
   while ( fscanf( fp, "%d", &x ) != EOF ) {
     pointers.push_back( x );
-    int es = qs->getPtrEqID(x);
-    if ( es != -1 )
-      ptr_filter->add_ptr(x);
+    ptr_filter->add_ptr(x);
   }
   
   fclose( fp );
-
-  int n_query = pointers.size();
-  //fprintf( stderr, "Query plan loaded : %d entries.\n", n_query );
+  ptr_filter->finalize();
   show_res_use( NULL );
 
   // Execute
+  int n_query = pointers.size();
   for ( int i = 0; i < n_query; ++i ) {
     switch ( query_opts.query_type ) {
     case IS_ALIAS:
@@ -244,7 +261,7 @@ traverse_result( IQuery *qs )
 
   AllAcceptFilter* ptr_filter = new AllAcceptFilter;
 
-  for ( int i = 0; i < n_query; ++i ) {
+  for ( int i = 0; i < 10; ++i ) {
     //x = queries[i];
     x = i;
 

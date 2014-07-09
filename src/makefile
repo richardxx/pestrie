@@ -1,4 +1,4 @@
-CFLAGS = -w -Wall -O3
+CFLAGS = -w -Wall -g
 BASIC_DEPS_H = bitmap.h profile_helper.h constants.hh 
 BASIC_DEPS_C = obstack.o bitmap.o profile_helper.o
 PESTRIE_DEPS_H = pestrie.hh segtree.hh treap.hh kvec.hh histogram.hh matrix-ops.hh
@@ -61,7 +61,7 @@ pesI: pes-indexer.cc  $(BASIC_DEPS_H) $(PESTRIE_DEPS_H) $(PESTRIE_DEPS_C) $(BASI
 bitI: bit-indexer.cc $(BASIC_DEPS_C) $(BASIC_DEPS_H) $(BITINDEX_DEPS_C) $(BITINDEX_DEPS_H)
 	$(CC) bit-indexer.cc $(BASIC_DEPS_C) $(BITINDEX_DEPS_C) $(CFLAGS) $(LIB) -o bitI
 
-qtester: qtester.cc pes-querier.o bit-querier.o matrix-ops.o shapes.hh query.hh query-inl.hh options.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
+qtester: qtester.cc pes-querier.o bit-querier.o matrix-ops.o query.hh options.hh $(BASIC_DEPS_H) $(BASIC_DEPS_C)
 	$(CC) qtester.cc pes-querier.o bit-querier.o matrix-ops.o $(BASIC_DEPS_C) $(CFLAGS) $(LIB) -o qtester
 
 #bitQ: bit-querier.cc query.hh $(BASIC_DEPS_C) $(BASIC_DEPS_H) matrix-ops.o

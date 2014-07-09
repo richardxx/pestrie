@@ -224,8 +224,8 @@ PesTrieDual::build_index()
 	
 	// Insert
 	++n_gen_rects;
-	if ( query_point( seg_tree, r.x1, r.y1 ) == false ) {
-	  insert_segtree_wrapper( seg_tree, r );
+	if ( seg_tree->query_point( r.x1, r.y1 ) == false ) {
+	  seg_tree->insert_segtree( r );
 	}
       }
     }
@@ -245,7 +245,7 @@ PesTrieDual::build_index()
       // case-1
       r.y1 = preV[trA];
       r.y2 = lastV[trA];
-      insert_segtree_wrapper( seg_tree, r );
+      seg_tree->insert_segtree( r );
       ++n_gen_rects;
 
       // case-2
@@ -268,8 +268,8 @@ PesTrieDual::build_index()
 
 	// Insert
 	++n_gen_rects;
-	if ( query_point( seg_tree, pr->x1, pr->y1 ) == false )
-	  insert_segtree_wrapper( seg_tree, *pr );
+	if ( seg_tree->query_point( pr->x1, pr->y1 ) == false )
+	  seg_tree->insert_segtree( *pr );
       }      
     }
   }

@@ -7,14 +7,14 @@
 #define QUERY_INL_H
 
 static int
-iterate_equivalent_set( VECTOR(int) *es_set, IFilter* filter )
+iterate_equivalent_set( VECTOR(int) &es_set, IFilter* filter )
 {
   int ans = 0;
-  int size = es_set->size();
+  int size = es_set.size();
   
   for ( int i = 0; i < size; ++i ) {
-    int q = es_set->at(i);
-    if ( filter->validate(q) )
+    int q = es_set[i];
+    //    if ( filter->validate(q) )
       ans++;
   }
   

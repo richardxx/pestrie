@@ -126,11 +126,12 @@ BitQS::load_pt_index( FILE *fp )
     if ( m_type != i ) i = m_type;
     
     Cmatrix *cm = new Cmatrix( dim_r, dim_c, true, false );
-    bitmap *mat = cm->mat;
     bool skip = (trad_mode && m_type > I_PT_MATRIX);
-    for ( int k = 0; k < dim_r; ++k )
-      mat[k] = bitmap_read_row( fp, COMPRESSED_FORMAT, skip );
-    
+    for ( int k = 0; k < dim_r; ++k ) {
+      bitmap r = bitmap_read_row( fp, COMPRESSED_FORMAT, skip );
+      cm->set(k, r);
+    }
+
     profile_matrix( cm, pt_matrix_info[i], stderr );
     qmats[i++] = cm;
   }
@@ -166,10 +167,11 @@ BitQS::load_se_index( FILE *fp )
     if ( m_type != i ) i = m_type;
     
     Cmatrix *cm = new Cmatrix( dim_r, dim_c, true, false );
-    bitmap *mat = cm->mat;
     bool skip = (trad_mode && m_type > I_LOAD_MATRIX);
-    for ( int k = 0; k < dim_r; ++k )
-      mat[k] = bitmap_read_row( fp, COMPRESSED_FORMAT, skip );
+    for ( int k = 0; k < dim_r; ++k ) {
+      bitmap r = bitmap_read_row( fp, COMPRESSED_FORMAT, skip );
+      cm->set(k, r);
+    }
 
     profile_matrix( cm, se_matrix_info[i], stderr );
     qmats[i] = cm;
@@ -256,8 +258,7 @@ BitQS::ListPointsTo( int x, IFilter* filter )
   if ( x != -1 ) {
     bitmap ptx = qmats[I_PT_MATRIX]->at(x);
     EXECUTE_IF_SET_IN_BITMAP( ptx, 0, o, bi ) {
-      VECTOR(int) *objs = &es2objs[o];
-      ans += iterate_equivalent_set( objs, filter );
+      ans += iterate_equivalent_set( es2objs[o], filter );
     }
   }
 
@@ -276,8 +277,7 @@ BitQS::ListPointedBy( int o, IFilter* filter )
   if ( o != -1 ) {
     bitmap pto = qmats[I_PTED_MATRIX]->at(o);
     EXECUTE_IF_SET_IN_BITMAP( pto, 0, p, bi ) {
-      VECTOR(int) *ptrs = &es2ptrs[p];
-      ans += iterate_equivalent_set( ptrs, filter );
+      ans += iterate_equivalent_set( es2objs[p], filter );
     }
   }
 
@@ -289,16 +289,17 @@ BitQS::ListAliases( int x, IFilter* filter )
 {
   int ans = 0;
   unsigned q, o;
-  bitmap_iterator bi;
-  bitmap res;
 
   // Translate base pointer to its rerepsentative
   x = pt_map[x];
 
   // Continue if x has points-to information
   if ( x != -1 ) {
-    Cmatrix **qmats = qmats;
-    res = qmats[I_ALIAS_MATRIX]->at(x);
+    bitmap res = NULL;
+    bitmap_iterator bi;
+
+    //    if ( !trad_mode )
+      res = qmats[I_ALIAS_MATRIX]->at(x);
     
     // We compute the result immediately
     if ( res == NULL ) {
@@ -311,13 +312,13 @@ BitQS::ListAliases( int x, IFilter* filter )
     	bitmap_ior_into( res, ptedm->at(o) );
       }
       
-      qmats[I_ALIAS_MATRIX]->set(x, res);
+      //      if ( !trad_mode )
+	qmats[I_ALIAS_MATRIX]->set(x, res);
     }
     
     // Extract the base pointers as the answer
     EXECUTE_IF_SET_IN_BITMAP( res, 0, q, bi ) {
-      VECTOR(int) *ptrs = &es2ptrs[q];
-      ans += iterate_equivalent_set( ptrs, filter );
+      ans += iterate_equivalent_set( es2ptrs[q], filter );
     }
   }
   
@@ -422,8 +423,7 @@ BitQS::ListLoads( int x, IFilter* filter )
 
   // visit
   EXECUTE_IF_SET_IN_BITMAP( res_other, 0, v, bi ) {
-    VECTOR(int) *stores = &es2ptrs[v];
-    ans += iterate_equivalent_set( stores, filter );
+    ans += iterate_equivalent_set( es2objs[v], filter );
   }
   
   return ans;
@@ -453,8 +453,7 @@ BitQS::ListStores( int x, IFilter* filter )
   }
   
   EXECUTE_IF_SET_IN_BITMAP( res_other, 0, v, bi ) {
-    VECTOR(int) *stmts = &es2ptrs[v+n_st];
-    ans += iterate_equivalent_set( stmts, filter );
+    ans += iterate_equivalent_set( es2objs[v+n_st], filter );
   }
 
   // Store-store conflicts
@@ -471,8 +470,7 @@ BitQS::ListStores( int x, IFilter* filter )
   }
   
   EXECUTE_IF_SET_IN_BITMAP( res_self, 0, v, bi ) {
-    VECTOR(int) *stmts = &es2ptrs[v];
-    ans += iterate_equivalent_set( stmts, filter );
+    ans += iterate_equivalent_set( es2objs[v], filter );
   }
 
   return ans;

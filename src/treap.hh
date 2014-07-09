@@ -9,45 +9,26 @@
 
 #define INDEX_UTILITY
 #include "shapes.hh"
-#include <cstdlib>
+#include "options.hh"
 
 // Finally, the treap node
 struct TreapNode
 {
-  int rkey;                         // A random key used to maintain the heap property
-  VLine* data;                      // Pointer to the actual shape data
+  int rkey;                                // A random key used to maintain the heap property
+  struct VLine* data;                      // Pointer to the actual shape data
   struct TreapNode *left, *right;
-  
-  TreapNode( VLine *r )
-  {
-    data = r;
-    rkey = std::rand();
-    left = right = NULL;
-  }  
+
+public:
+  TreapNode( VLine* );
 };
 
 
 // Standard procedures for operating treap
-VLine* find_treap( TreapNode*, int);
-TreapNode* insert_treap( TreapNode*, VLine*);
-TreapNode* remove_treap( TreapNode*, int);
+VLine* find_treap( TreapNode*, int );
+TreapNode* insert_treap( TreapNode*, VLine* );
+TreapNode* remove_treap( TreapNode*, int );
+void inorder_treap( TreapNode*, VECTOR(VLine*)& );
 void clean_treap( TreapNode* );
-
-
-// Inorder traversal of treap and collect the figures
-template<class T> void 
-inorder_treap( TreapNode *p, VECTOR(T) &collector )
-{
-  if ( p == NULL ) return;
-  
-  if ( p->left != NULL )
-    inorder_treap<T>( p->left, collector );
-  
-  collector.push_back((T)p->data);
-  
-  if ( p->right != NULL )
-    inorder_treap<T>( p->right, collector );
-}
 
 
 #endif

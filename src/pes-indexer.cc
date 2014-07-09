@@ -175,7 +175,7 @@ execute_query( PesTrie *pestrie )
 	x = preV[x];
 	y = preV[y];
 	if ( x > y ) { x ^= y; y ^= x; x ^= y; }
-	ans = query_point( seg_tree, x, y );
+	ans = seg_tree->query_point( x, y );
       }
     }
     printf( "(%d, %d) = %s\n", x, y, (ans == true ? "true" : "false") );
