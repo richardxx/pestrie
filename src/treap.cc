@@ -55,17 +55,15 @@ remove_node( TreapNode* p )
   
   // case 3
   if ( p->left->rkey <= p->right->rkey ) {
-    // We turn left
-    p->rkey = p->left->rkey;
-    p->data = p->left->data;
-    p->left = remove_node( p->left ); 
+    // Using left child as the new root
+    p = rotate_right(p);
+    p->right = remove_node( p->right ); 
   }
   else {
-    p->rkey = p->right->rkey;
-    p->data = p->right->data;
-    p->right = remove_node( p->right );
+    p = rotate_left(p);
+    p->left = remove_node( p->left );
   }
-
+  
   return p;
 }
 

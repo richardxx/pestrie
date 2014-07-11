@@ -36,6 +36,7 @@ struct SegTree
   int maxN;
   SegTreeNode **unitNodes;
   int n_points, n_horizs, n_vertis, n_rects;
+  int n_out_points, n_out_horizs, n_out_vertis, n_out_rects;
   int n_pairs;
 
   SegTree( int );

@@ -254,7 +254,8 @@ PesTrie::advanced_profile_pestrie()
   if ( this->pes_opts->profile_in_detail == false )
     return;
   
-  fprintf( stderr, "\n--------------Additional Information for Index--------------\n" );
+  //fprintf( stderr, "\n" );
+  //fprintf( stderr, "--------------Additional Information for Index--------------\n" );
 
   int n = this->n;
   int m = this->m;
@@ -430,6 +431,33 @@ PesTrie::externalize_index( FILE* fp, const char* magic_number)
   // Write the figures
   seg_tree->flush_left_shapes();
   n_labels += seg_tree->dump_figures( fp );
+
+  // Profile
+  int n_points = seg_tree->n_out_points;
+  int n_vertis = seg_tree->n_out_vertis;
+  int n_horizs = seg_tree->n_out_horizs;
+  int n_rects = seg_tree->n_out_rects;
+  int n_total_stored = n_points + n_vertis + n_horizs + n_rects;
+
+  fprintf( stderr, "\n--------------Persistence Generation---------------\n" );
+  fprintf( stderr, "We persist %d figures.\n", 
+	   n_total_stored );
+
+  fprintf( stderr, "-->%d rectangles, percentage = %.2lf\%\n", 
+	   n_rects, 
+	   (double)(n_rects) / n_total_stored * 100 );
+
+  fprintf( stderr, "-->%d vertical lines, percentage = %.2lf\%\n", 
+	   n_vertis, 
+	   (double)(n_vertis) / n_total_stored * 100 );
+
+  fprintf( stderr, "-->%d horizontal lines, percentage = %.2lf\%\n", 
+	   n_horizs,
+	   (double)(n_horizs) / n_total_stored * 100 );
+
+  fprintf( stderr, "-->%d points, percentage = %.2lf\%\n", 
+	   n_points,
+	   (double)(n_points) / n_total_stored * 100 );
 
   // Estimate the index size (almost real)
   double intsize = sizeof(int);

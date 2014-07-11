@@ -13,7 +13,7 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
-#include <set>
+#include <cassert>
 #include "options.hh"
 #include "shapes.hh"
 //#include "bitmap.h"
@@ -23,6 +23,34 @@
 
 using namespace std;
 
+static bool 
+comp_strips( VLine* r1, VLine* r2 )
+{
+  return r1->y1 < r2->y1;
+}
+
+static bool 
+comp_rect( Rectangle* r1, Rectangle* r2 )
+{
+  return r1->y1 < r2->y1;
+}
+
+static void
+push_and_merge( VECTOR(VLine*) &rects, VLine* p )
+{
+  if ( rects.size() != 0 ) {
+    VLine* &vlast = rects.back();
+    if ( vlast->y2 + 1 == p->y1 ) {
+      // Concatenate them
+      // TODO: Memory leak
+      vlast = new VLine(vlast->y1, p->y2);
+      return;
+      }
+  }
+  
+  rects.push_back(p);
+}
+
 // The segment tree node
 // We still use segment tree as the fundamental querying structure
 class SegNode
@@ -31,56 +59,75 @@ public:
   // This node represents the range [l, r]
   int l, r;
   SegNode *left, *right, *parent;
-  bool merged;
-
+  bool merged, pt_extracted;
+  
   VECTOR(VLine*) rects;
-  //VECTOR(int) pointsto;
-
+  VECTOR(int) pointsto;
+  
   SegNode()
   {
     left = right = NULL;
     parent = NULL;
     merged = false;
-  }
-
-  void add_rect( VLine* p ) 
-  { 
-    rects.push_back(p);
+    pt_extracted = false;
   }
   
-  int n_of_rects() 
-  {
-    return rects.size();
+  void add_rect( VLine* p ) 
+  { 
+    push_and_merge( rects, p );
   }
+  
+  void add_points_to( int o )
+  {
+    pointsto.push_back(o);
+  }
+
+  int n_of_rects() { return rects.size(); }
 };
+
+class SegUnitNode : public SegNode
+{
+public:
+  VECTOR(VLine*) strips;
+
+  SegUnitNode() {}
+
+  void add_strip( VLine* p )
+  {
+    strips.push_back(p);
+  }
+
+  int n_of_strips() { return strips.size(); }
+};
+
 
 // The segment tree structure for querying system
 class SegTree
 {
 public:
-  SegTree(int maxN)
+  SegTree(int n_range)
   {
-    segUnits = new SegNode*[maxN];
-    segRoot = build_seg_tree(0, maxN-1);
-    n_range = maxN;
+    unitNodes = new SegUnitNode*[n_range];
+    segRoot = build_seg_tree(0, n_range-1);
+    maxN = n_range;
   }
 
   ~SegTree()
   {
-    free(segUnits);
+    free(unitNodes);
     free_seg_tree( segRoot );
   }
 
   SegNode* get_unit_node( int x ) 
   { 
-    return segUnits[x]; 
+    return unitNodes[x]; 
   }
 
   void optimize_seg_tree();
   void recursive_merge( SegNode* p );
-  void insert_point( int x, int y );
   void insert_point( int x, VLine* p );
   void insert_rect( int x1, int x2, VLine* pr );
+  bool verify();
 
 private:
   SegNode* build_seg_tree( int l, int r );
@@ -90,27 +137,26 @@ private:
   
 private:
   // The pointers to the unit nodes
-  SegNode **segUnits;
+  SegUnitNode **unitNodes;
   // The pointer to the root
   SegNode *segRoot;
   // The range of X-aixs
-  int n_range;
+  int maxN;
 };
 
 
 SegNode*
 SegTree::build_seg_tree( int l, int r )
 {
-  int x = (l+r) / 2;
-  SegNode* p = new SegNode; 
-  
-  p->l = l;
-  p->r = r;
+  SegNode* p;
 
   if ( l == r ) {
-    segUnits[l] = p;
+    p = new SegUnitNode;
+    unitNodes[l] = (SegUnitNode*)p;
   }
   else {
+    p = new SegNode;
+    int x = (l+r) / 2;
     if ( l <= x ) {
       p->left = build_seg_tree( l, x );
       p->left->parent = p;
@@ -122,6 +168,8 @@ SegTree::build_seg_tree( int l, int r )
     }
   }
   
+  p->l = l;
+  p->r = r;
   return p;
 }
 
@@ -139,6 +187,7 @@ SegTree::free_seg_tree( SegNode* p )
 
 /*
  * We update the parent links to skip the empty nodes.
+ * The points-to information is also extracted.
  */ 
 void
 SegTree::__opt_seg_tree( SegNode* p ) 
@@ -150,9 +199,6 @@ SegTree::__opt_seg_tree( SegNode* p )
     q = q->parent;
     p->parent = q;
   }
-  
-  if ( q == NULL )
-    p->merged = true;
 
   if ( p->left != NULL )
     __opt_seg_tree( p->left );
@@ -160,17 +206,56 @@ SegTree::__opt_seg_tree( SegNode* p )
     __opt_seg_tree( p->right );
 }
 
+static void
+merge_into( VECTOR(VLine*) &list1, VECTOR(VLine*) &list2 )
+{
+  int sz1 = list1.size();
+  int sz2 = list2.size();
+
+  if ( sz2 == 0 ) return;
+
+  if ( sz1 == 0 ) {
+    // Fast path, just copy
+    list1.add_all( list2 );
+    return;
+  }
+  
+  VECTOR(VLine*) list3(sz1+sz2);
+  int i = 0, j = 0;
+  VLine *r1 = list1[0], *r2 = list2[0];
+  
+  while ( i < sz1 || j < sz2 ) {
+    if ( j == sz2 ||
+	 ( i < sz1 && r1->y1 < r2->y1 ) ) {
+      push_and_merge( list3, r1 );
+      //list3.push_back(r1);
+      ++i;
+      if ( i < sz1 ) r1 = list1[i];
+    }
+    else {
+      push_and_merge( list3, r2 );
+      //list3.push_back(r2);
+      ++j;
+      if ( j < sz2 ) r2 = list2[j];
+    }
+  }
+
+  list1.swap(list3);
+}
+
 void
 SegTree::optimize_seg_tree()
 {
-  __opt_seg_tree( segRoot );
-
-  // We also optimize the unit pointers
-  for ( int i = 0; i < n_range; ++i ) {
-    SegNode* p = segUnits[i];
-    if ( p->n_of_rects() == 0 )
-      segUnits[i] = p->parent;
+  // We first merge the figures in the unit nodes
+  for ( int i = 0; i < maxN; ++i ) {
+    SegUnitNode* p = unitNodes[i];
+    if ( p->n_of_strips() != 0 ) {
+      merge_into( p->rects, p->strips );
+    }
   }
+
+  // We recursively process the figures
+  __opt_seg_tree( segRoot );
 }
 
 // We do merging sort
@@ -179,60 +264,20 @@ SegTree::recursive_merge( SegNode* p )
 {
   if ( p->merged == true ||
        p->parent == NULL ) return;
+  
+  // process its parent first
   recursive_merge( p->parent );
 
-  VECTOR(VLine*) &list1 = p->parent->rects;
-  int sz1 = list1.size();
-  int sz2 = p->rects.size();
-
-  if ( sz1 != 0 ) {
-    // We have something to merge from top down
-    VECTOR(VLine*) &list3 = p->rects;
-    if ( sz2 == 0 ) {
-      // Fast path, just copy
-      list3.add_all( list1 );
-    }
-    else {
-      VECTOR(VLine*) list2;
-      list2.add_all( list3 );
-      list3.clear();
-
-      int i = 0, j = 0;
-      VLine *r1 = list1[0], *r2 = list2[0];
-      
-      while ( r1 != NULL || r2 != NULL ) {
-	if ( r2 == NULL || 
-	     ( r1 != NULL && r1->y1 < r2->y1 ) ) {
-	  list3.push_back(r1);
-	  ++i;
-	  if ( i >= sz1 ) r1 = NULL;
-	  else r1 = list1[i];
-	}
-	else {
-	  list3.push_back(r2);
-	  ++j;
-	  if ( j >= sz2 ) r2 = NULL;
-	  else r2 = list2[j];
-	}
-      }
-    }
-  }
-
+  VECTOR(VLine*) &list1 = p->rects;
+  VECTOR(VLine*) &list2 = p->parent->rects;
+  merge_into( list1, list2 );
   p->merged = true;
-}
-
-
-void
-SegTree::insert_point( int x, int y )
-{
-  VLine* p = new VLine(y, y);
-  insert_point(x, p);
 }
 
 void
 SegTree::insert_point( int x, VLine* p )
 {
-  segUnits[x]->add_rect(p);
+  unitNodes[x]->add_strip(p);
 }
 
 /*
@@ -260,6 +305,42 @@ SegTree::insert_rect( int x1, int x2, VLine* pr )
 }
 
 
+bool
+SegTree::verify()
+{
+  for ( int i = 0; i < maxN; ++i ) {
+    SegNode* p = unitNodes[i];
+    while ( p != NULL && 
+	    !p->merged ) {
+      VECTOR(VLine*) &rects = p->rects;
+      int size = rects.size();
+      int lasty = -1;
+      for ( int j = 0; j < size; ++j ) {
+	VLine* r = rects[j];
+	if ( r->y1 < lasty ) {
+	  fprintf( stderr, "Error [%d, %d]! X = %d, y1 = %d, lasty = %d, index = %d\n",
+		   p->l, p->r, i, r->y1, lasty, j );
+	  assert(r->y1 >= lasty);
+	}
+	lasty = r->y2;
+      }
+
+      // Temporarily use merged as a stop indicator
+      p -> merged = true;
+      p = p->parent;
+    }
+  }
+
+  for ( int i = 0; i < maxN; ++i ) {
+    SegNode* p = unitNodes[i];
+    while ( p!= NULL && p->merged ) {
+      p->merged = false;
+      p = p->parent;
+    }
+  }
+}
+
+
 // The querying interface for Pestrie
 class PesQS : public IQuery
 {
@@ -280,8 +361,9 @@ public:
   int getIndexType() { return index_type; }
 
 public:
-  void load_figures( FILE* fp );
-  void profile_pestrie();
+  void rebuild_mapping_info( FILE* );
+  void load_figures( FILE* );
+  void extract_pointsto(SegNode*);
 
 public:
   PesQS(int n_ptrs, int n_objs, int n_vertex, int type, int d_merging)
@@ -293,7 +375,7 @@ public:
     tree = new int[n_ptrs+n_objs];
     preV = new int[n_ptrs+n_objs];
     root_prevs = new int[n_objs+1];
-    root_tree = new int[n_vertex+1];
+    root_tree = new int[n_vertex];
     es2ptrs = new VECTOR(int)[n_vertex];
     qtree = new SegTree(n_vertex);
 
@@ -313,49 +395,39 @@ public:
     if ( index_type == PT_MATRIX ) delete es2objs;
   }
 
-public:
-  void rebuild_eq_groups( FILE* fp );
-  
 private:
   SegTree* qtree;
   
   // The maximum preorder timestamp for the store statements
   int max_store_prev;
-
   // The number of pointers, objects, trees, and nodes
   int n, m, n_trees, vertex_num;
-  // Mapping from pointer to tree ID
+  // Mapping from pointer and object to tree ID
   int *tree;
-  // Mapping from pointer to PesTrie ID
+  // Mapping from pointer and object to pre-order stamp
   int *preV;
   // Recording pre-order of the roots
   int *root_prevs;
   // Mapping the pre-order of root node to tree ID (-1 means this node is not a root)
   int *root_tree;
-
   // Mapping from equivalent set to pointers/objects
   VECTOR(int) *es2ptrs, *es2objs;
-
   // Points-to or side-effect information
   int index_type;
-  
   // Merging the aliasing information bottom up on demand
   bool demand_merging;
 };
 
 
-//Statistics
-//static int cnt_same_tree = 0;
-
 void
-PesQS::rebuild_eq_groups( FILE* fp )
+PesQS::rebuild_mapping_info( FILE* fp )
 {
   // Read in the pre-order descriptors for both pointers and objects
   fread( preV, sizeof(int), n+m, fp );
 
   // We label the time-stamps that could be roots
   n_trees = 0;
-  memset ( root_tree, -1, sizeof(int) * (vertex_num+1) );
+  memset ( root_tree, -1, sizeof(int) * vertex_num );
   
   for ( int i = 0; i < m; ++i ) { 
     int v = preV[n+i];
@@ -379,7 +451,7 @@ PesQS::rebuild_eq_groups( FILE* fp )
     int v = preV[n+i];
     if ( v != -1 ) {
       int tr = root_tree[v];
-      es2objs[tr].push_back(i);
+      es2objs[v].push_back(i);
       tree[i+n] = tr;
     }
   }
@@ -389,7 +461,7 @@ PesQS::rebuild_eq_groups( FILE* fp )
 
   // We re-discover the tree codes for pointers through the binary search
   // Sentinels
-  root_prevs[n_trees] = vertex_num + 1;
+  root_prevs[n_trees] = vertex_num;
   
   for ( int i = 0; i < n; ++i ) {
     int preI = preV[i];
@@ -415,16 +487,11 @@ PesQS::rebuild_eq_groups( FILE* fp )
   }
 }
 
-static bool 
-comp_rect( Rectangle* r1, Rectangle* r2 )
-{
-  return r1->y1 < r2->y1;
-}
-
 void
 PesQS::load_figures( FILE* fp )
 {
   int n_points = 0, n_horizs = 0, n_vertis = 0, n_rects = 0;
+  int cross_pairs = 0;
   int n_labels;
   int *labels = new int[vertex_num * 3];
   VECTOR(Rectangle*) all_rects(vertex_num);
@@ -441,14 +508,11 @@ PesQS::load_figures( FILE* fp )
       int x2, y2;
 
       if ( (y1&SIG_FIGURE) == SIG_POINT ) {
-	// This is a point, directly insert it
-	qtree->insert_point( x1, y1 );
-	qtree->insert_point( y1, x1 );
+	x2 = x1;
+	y2 = y1;
 	++n_points;
-	continue;
       }
-
-      if ( (y1&SIG_FIGURE) == SIG_VERTICAL ) {
+      else if ( (y1&SIG_FIGURE) == SIG_VERTICAL ) {
 	y1 &= ~SIG_VERTICAL;
 	y2 = labels[i++];
 	x2 = x1;
@@ -467,8 +531,10 @@ PesQS::load_figures( FILE* fp )
 	++n_rects;
       }
 
+      assert( x1 <= x2 && x2 <= y1 && y1 <= y2 );
+      
       // First, insert the reversed figure 
-      // (must insert before original figure)
+      // (must insert before the original figure)
       VLine* p = new VLine(x1, x2);
       if ( y1 == y2 ) {
 	qtree->insert_point(y1, p);
@@ -486,16 +552,44 @@ PesQS::load_figures( FILE* fp )
 	Rectangle* r = new Rectangle(x1, x2, y1, y2);
 	all_rects.push_back(r);
       }
+      
+      cross_pairs += (x2-x1+1)*(y2-y1+1)*2;
     }
   }
+
+  int size = all_rects.size();
+  /*
+  for ( int i = 0; i < size; ++i ) {
+    Rectangle* r = all_rects[i];
+    assert( r->x1 <= r->x2 );
+    assert( r->x2 <= r->y1 );
+    assert( r->y1 <= r->y2 );
+  }
+  */
 
   // We sort the cached figures by y1
   sort( all_rects.begin(), all_rects.end(), comp_rect );
 
-  // We insert the cached figures
-  int size = all_rects.size();
+  /*
   for ( int i = 0; i < size; ++i ) {
     Rectangle* r = all_rects[i];
+    assert( r->x1 <= r->x2 );
+    assert( r->x2 <= r->y1 );
+    assert( r->y1 <= r->y2 );
+  }
+  */
+
+  // We insert the cached figures
+  int lasty = -1;
+  for ( int i = 0; i < size; ++i ) {
+    Rectangle* r = all_rects[i];
+    /*
+    if ( r->y1 < lasty ) {
+      fprintf( stderr, "Sort error! Index = %d\n", i );
+      assert( r->y1 >= lasty );
+    }
+    lasty = r->y1;
+    */
     qtree->insert_rect( r->x1, r->x2, r );
   }
 
@@ -503,25 +597,32 @@ PesQS::load_figures( FILE* fp )
   qtree->optimize_seg_tree();
   delete[] labels;
 
-  fprintf( stderr, "--------Figures--------\n" );
-  fprintf( stderr, 
-	   "Points = %d, Verticals = %d, Horizontals = %d, Rectangles = %d\n",
-	   n_points, n_vertis, n_horizs, n_rects );
-}
+  //qtree->verify();
 
-void 
-PesQS::profile_pestrie()
-{
+  // Profile
   int non_empty_nodes = 0;
+  int internal_pairs = 0;
 
   for ( int i = 0; i < vertex_num; ++i ) {
     VECTOR(int) &ptrs = es2ptrs[i];
     if ( ptrs.size() > 0 )
       ++non_empty_nodes;
   }
+
+  for ( int i = 0; i < n_trees; ++i ) {
+    int sz = root_prevs[i+1] - root_prevs[i];
+    internal_pairs += sz * (sz-1) / 2;
+  }
   
   fprintf( stderr, "Trees = %d, ES = %d, Non-empty ES = %d\n", 
 	   n_trees, vertex_num, non_empty_nodes );
+
+  fprintf( stderr, 
+	   "Points = %d, Verticals = %d, Horizontals = %d, Rectangles = %d\n",
+	   n_points, n_vertis, n_horizs, n_rects );
+
+  fprintf( stderr,
+	   "Alias pairs = %d\n", internal_pairs + cross_pairs );
 }
 
 static bool
@@ -532,33 +633,31 @@ binary_search( VECTOR(VLine*) &rects, int y )
 
   s = 0; 
   e = rects.size();
-  /*
-  if ( e < 3 ) {
-    // fast path
-    while ( s < e ) {
-      tt = rects[s];
-      if ( tt->y2 >= y &&
-	   tt->y1 <= y ) return true;
-      ++s;
-    }
-  }
-  else {
-  */
-    while ( e > s ) {
-      mid = (s+e) / 2;
-      tt = rects[mid];
-      
-      if ( tt->y2 >= y ) {
-	if ( tt->y1 <= y ) {
-	  // Found the closest one
-	  return true;
-	}
-	e = mid;
+
+  while ( e > s ) {
+    mid = (s+e) / 2;
+    tt = rects[mid];
+    
+    if ( tt->y2 >= y ) {
+      if ( tt->y1 <= y ) {
+	// Found the closest one
+	return true;
       }
-      else
-	s = mid + 1;
+      e = mid;
     }
-    //  }
+    else
+      s = mid + 1;
+  }
+
+  /*
+  // Processing small case
+  while ( s < e ) {
+    tt = rects[s];
+    if ( tt->y2 >= y &&
+	 tt->y1 <= y ) return true;
+    ++s;
+  }
+  */
 
   return false;
 }
@@ -581,14 +680,15 @@ PesQS::IsAlias( int x, int y )
   x = preV[x];
   y = preV[y];
   p = qtree->get_unit_node(x);
+  if ( p == NULL ) return false;
 
   if ( !demand_merging ) {
     // We traverse the segment tree bottom up
-    while ( p != NULL ) {    
+    do {
       if ( binary_search( p->rects, y ) ) 
 	return true;
       p = p->parent;
-    }
+    } while ( p!= NULL );
   }
   else {
     qtree->recursive_merge(p);
@@ -599,24 +699,54 @@ PesQS::IsAlias( int x, int y )
   return false;
 }
 
+void
+PesQS::extract_pointsto( SegNode* p )
+{
+  VECTOR(VLine*) &rects = p->rects;
+  int size = rects.size();
+
+  for ( int i = 0; i < size; ++i ) {
+    VLine* r = rects[i];
+    int lower = r->y1;
+    int upper = r->y2;
+    do {
+      if ( root_tree[lower] != -1 )
+	p->add_points_to(lower);
+      ++lower;
+    } while (lower <= upper);
+  }
+
+  p->pt_extracted = true;
+}
+
 // List query in real use should be passed in a handler.
 // That handler decide what to do with the query answer.
 int 
 PesQS::ListPointsTo( int x, IFilter* filter )
 {
-  SegNode *p;
-  VECTOR(int) *objs;
-  int ans = 0;
-
   int tr = tree[x];
   if ( tr == -1 ) return 0;
   
   // Don't forget x points-to tree[x]
-  ans += iterate_equivalent_set( es2objs[tr], filter );
+  int ans = iterate_equivalent_set( es2objs[root_prevs[tr]], filter );
   
   x = preV[x];
-  p = qtree->get_unit_node(x);
-  
+  SegNode* p = qtree->get_unit_node(x);
+
+  // traverse the rectangles up the tree
+  while ( p != NULL ) {
+    if ( p->pt_extracted == false )
+      extract_pointsto(p);
+
+    VECTOR(int) &pointsto = p->pointsto;
+    int size = pointsto.size();
+    for ( int i = 0; i < size; ++i ) {
+      int o = pointsto[i];
+      ans += iterate_equivalent_set( es2objs[o], filter );	
+    }
+    p = p->parent;
+  }
+
   return ans;
 }
 
@@ -628,19 +758,16 @@ PesQS::ListAliases( int x, IFilter* filter )
   if ( tr == -1 ) return 0;
   
   int ans = 0;
-  x = preV[x];
 
-#define VISIT_POINT(v)							\
-  ans += iterate_equivalent_set( es2ptrs[v], filter );			
-  
   // We first extract the ES groups that belong to the same subtree
   {
     int upper = root_prevs[tr+1];
     for ( int i = root_prevs[tr]; i < upper; ++i ) {
-      VISIT_POINT(i);
+      ans += iterate_equivalent_set( es2ptrs[i], filter );
     }
   }
 
+  x = preV[x];
   SegNode *p = qtree->get_unit_node(x);
 
   // traverse the rectangles up the tree
@@ -649,12 +776,12 @@ PesQS::ListAliases( int x, IFilter* filter )
     int size = rects.size();
     for ( int i = 0; i < size; ++i ) {
       VLine *r = rects[i];
-      int lower = r->y1;						
-      int upper = r->y2;						
-      do {							
-	VISIT_POINT(lower);					
-	++lower;							
-      } while ( lower <= upper );					
+      int lower = r->y1;
+      int upper = r->y2;
+      do {
+	ans += iterate_equivalent_set( es2ptrs[lower], filter );	
+	++lower;
+      } while ( lower <= upper );			
     }
     p = p->parent;
   }
@@ -677,12 +804,7 @@ PesQS::ListModRefVars( int x, IFilter* filter )
 int
 PesQS::ListConflicts( int x, IFilter* filter )
 {
-  int ans = 0;
-
-  if ( preV[x] < max_store_prev )
-    ans = ListAliases( x, filter );
-  
-  return ans;
+  return ListAliases( x, filter );
 }
 
 IQuery*
@@ -697,11 +819,11 @@ load_pestrie_index(FILE* fp, int index_type, bool d_merging )
   
   // Initialize the querying struture
   PesQS* pesqs = new PesQS( n, m, vertex_num, index_type, d_merging );
-  
+  fprintf( stderr, "----------Index File Info----------\n" );
+
   // Loading and decoding the persistence file
-  pesqs->rebuild_eq_groups(fp);
+  pesqs->rebuild_mapping_info(fp);
   pesqs->load_figures(fp);
-  pesqs->profile_pestrie();
   
   return pesqs;
 }

@@ -20,12 +20,14 @@ struct VLine
 {
   int y1, y2;
 
-  VLine() { }
-  
-  VLine( int y1, int y2 ) 
+  VLine() 
   { 
-    this->y1 = y1; 
-    this->y2 = y2; 
+  }
+  
+  VLine( int Y1, int Y2 ) 
+  { 
+    y1 = Y1; 
+    y2 = Y2; 
   }
 
   VLine( const VLine& other ) 
@@ -54,6 +56,17 @@ struct VLine
     labels[1] = y2;
     return 2;
   }
+
+  virtual bool merge(VLine* other)
+  {
+    if ( other->get_type() != SIG_VERTICAL ) return false;
+    if ( other->y1 == y2 + 1 ) {
+      y2 = other->y2;
+      return true;
+    }
+
+    return false;
+  }
 #endif
 };
 
@@ -67,11 +80,11 @@ struct Rectangle : public VLine
   
   Rectangle() { }
 
-  Rectangle( int X1, int Y1, int X2, int Y2 )
+  Rectangle( int X1, int X2, int Y1, int Y2 )
   {
     x1 = X1;
-    y1 = Y1;
     x2 = X2;
+    y1 = Y1;
     y2 = Y2;
   }
 
@@ -83,8 +96,8 @@ struct Rectangle : public VLine
   Rectangle& operator=( const Rectangle& other )
   {
     x1 = other.x1;
-    y1 = other.y1;
     x2 = other.x2;
+    y1 = other.y1;
     y2 = other.y2;
     return *this;
   }
@@ -106,6 +119,20 @@ struct Rectangle : public VLine
     labels[1] = x2;
     labels[2] = y2;
     return 3;
+  }
+
+  bool merge(VLine* other)
+  {
+    if ( other->get_type() != SIG_RECT ) return false;
+
+    Rectangle* o = (Rectangle*)other;
+    if ( o->x1 == x1 && o->x2 == x2 
+	 && o->y1 == y2 + 1 ) {
+      y2 = o->y2;
+      return true;
+    }
+    
+    return false;
   }
 #endif
 };

@@ -64,7 +64,6 @@ SegTree::insert_unit_node(int x, VLine* pv)
   SegTreeNode* p = get_unit_node(x);
   p->rects = insert_treap( p->rects, pv );
 }
-
  
 bool 
 SegTreeNode::collect_figures( VECTOR(VLine*) &fs )
@@ -86,10 +85,8 @@ SegTree::SegTree( int mx )
   unitNodes = new SegTreeNode*[mx];
   memset( unitNodes, 0, sizeof(void*) * mx );
 
-  n_points = 0;
-  n_horizs = 0;
-  n_vertis = 0;
-  n_rects = 0;
+  n_points = n_horizs = n_vertis = n_rects = 0;
+  n_out_points = n_out_horizs = n_out_vertis = n_out_rects = 0;
   n_pairs = 0;
 }
 
@@ -185,6 +182,7 @@ SegTree::flush_left_shapes()
 {
   // Collect the rectangles and reinsert
   VECTOR(VLine*) fs;
+  //fprintf( stderr, "----------Flush left\n" );
 
   for ( int i = 0; i < maxN; ++i ) {
     SegTreeNode *segNode = unitNodes[i];
@@ -194,6 +192,7 @@ SegTree::flush_left_shapes()
     
     // Redistribute the figures
     int size = fs.size();
+    //if ( size >= 1000 ) fprintf( stderr, "X = %d, Size = %d\n", i, size );
     for ( int j = 0; j < size; ++j ) {
       VLine* r = fs[j];
       
@@ -205,17 +204,38 @@ SegTree::flush_left_shapes()
 	  segNode->rects = remove_treap( segNode->rects, r->y1 );
 	
 	  // Insert again
-	  if (unitNodes[x1] == NULL ) {
-	    unitNodes[x1] = new SegTreeNode;
-	  }
-	
-	  SegTreeNode* p = unitNodes[x1];
+	  SegTreeNode* p = get_unit_node(x1);
 	  p->rects = insert_treap( p->rects, r );
 	}
       }
     }
   }
 }
+
+static void
+merge_figures(VECTOR(VLine*) &fs)
+{
+  int size = fs.size();
+  if ( size < 2 ) return;
+
+  int last_pos = 0;
+  VLine* last_fig = fs[0];
+  
+  for ( int i = 1; i < size; ++i ) {
+    VLine* p = fs[i];
+    if ( !last_fig->merge(p) ) {
+      fs[last_pos++] = last_fig;
+      last_fig = p;
+    }
+    else {
+      delete p;
+    }
+  }
+  
+  fs[last_pos++] = last_fig;
+  while ( fs.size() > last_pos ) fs.pop_back();
+}
+
 
 // Traverse and write the figures into a binary format file
 int
@@ -225,6 +245,7 @@ SegTree::dump_figures( FILE* fp )
   int *labels = new int[maxN*3];
   int total_labels = 0;
 
+  //fprintf( stderr, "-------------->Dump figures\n" );
   // Visit the figures
   for ( int i = 0; i < maxN; ++i ) {
     // Reset
@@ -232,14 +253,43 @@ SegTree::dump_figures( FILE* fp )
     SegTreeNode *segNode = unitNodes[i];
     if ( segNode != NULL &&
 	 segNode->collect_figures( fs ) ) {
+
+      // Merging adjacent figures
+      merge_figures(fs);
+
       // Write out
       int size = fs.size();
+      //if ( size >= 100 ) fprintf( stderr, "X = %d, Size = %d\n", i, size );
+      //int lasty = -1;
       for ( int j = 0; j < size; ++j ) {
 	VLine *r = fs[j];
+	
+	// Verify
+	/*
+	if ( r->y1 <= lasty ) {
+	  fprintf( stderr, "Not sorted! X = %d, Y = %d\n", i, r->y1 );
+	}
+	lasty = r->y2;
+	
+	if ( r->get_type() == SIG_RECT &&
+	     ((Rectangle*)r)->x1 != i ) {
+	  fprintf( stderr, "Not aligned! X = %d, Expected = %d\n",
+		   ((Rectangle*)r)->x1, i );
+	}
+	*/
+	if ( r->get_type() == SIG_VERTICAL ) {
+	  if ( r->y1 == r->y2 ) ++n_out_points;
+	  else ++n_out_vertis;
+	}
+	else {
+	  if ( r->y1 == r->y2 ) ++n_out_horizs;
+	  else ++n_out_rects;
+	}
+
 	offset += r->prepare_labels( labels + offset );
       }
     }
-
+    
     labels[0] = offset - 1;
     total_labels += offset;
     fwrite( labels, sizeof(int), offset, fp );

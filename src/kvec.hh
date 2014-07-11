@@ -114,6 +114,20 @@ public:
       a[i] = t;
     }
   }
+
+  // Swap the contents with another vector
+  void swap( fast_vec_t<T> &other )
+  {
+    int nn = other.n;
+    int mm = other.m;
+    T *aa = other.a;
+    
+    other.n = n;
+    other.m = m;
+    other.a = a;
+    
+    n = nn; m = mm; a = aa;
+  }
   
   void resize( int size )
   {
@@ -133,9 +147,11 @@ public:
     m = size;
   }
 
-
+  // We don't check the range
   T& operator[](int inx) { return a[inx]; }
   T& at( int inx ) { return a[inx]; }
+  T& back() { return a[n-1]; }
+
   void set( int inx, T& v ) { a[inx] = v; }
   void reset_end( int inx ) {
     if ( inx <= m )
@@ -156,6 +172,8 @@ public:
     a[n++] = x;
   }
 
+  T& pop_back() { return a[--n]; }
+ 
   void add_all( fast_vec_t<T> &other ) 
   {
     int sz = other.size();

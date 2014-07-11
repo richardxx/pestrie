@@ -1,5 +1,5 @@
-CFLAGS = -w -Wall -g
-BASIC_DEPS_H = bitmap.h profile_helper.h constants.hh 
+CFLAGS = -w -Wall -O3
+BASIC_DEPS_H = bitmap.h profile_helper.h constants.hh shapes.hh
 BASIC_DEPS_C = obstack.o bitmap.o profile_helper.o
 PESTRIE_DEPS_H = pestrie.hh segtree.hh treap.hh kvec.hh histogram.hh matrix-ops.hh
 PESTRIE_DEPS_C = segtree.o treap.o pes-common.o pes-self.o pes-dual.o matrix-ops.o

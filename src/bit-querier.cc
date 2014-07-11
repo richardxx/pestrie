@@ -224,26 +224,22 @@ BitQS::IsAlias( int x, int y )
   if ( x == -1 ) return false;
   y = pt_map[y];
   if ( y == -1 ) return false;
+  if ( x == y ) return true;
 
-  if ( x == y ) {
-    //++cnt_same_es;
-    return true;
-  }
-
-  int ret = 0;
-
+  int ans = 0;
+  
   if ( trad_mode == true ) {
     Cmatrix* ptm = qmats[I_PT_MATRIX];
-    ret = bitmap_same_bit_p( ptm->at(x), ptm->at(y) );
+    ans = bitmap_same_bit_p( ptm->at(x), ptm->at(y) );
   }
   else {
     // We lookup the result in alias matrix
     Cmatrix *am = qmats[I_ALIAS_MATRIX];
     bitmap amx = am->at(x);
-    ret = bitmap_bit_p( amx, y );
+    ans = bitmap_bit_p( amx, y );
   }
   
-  return ret != 0;
+  return ans != 0;
 }
 
 int 
@@ -277,7 +273,7 @@ BitQS::ListPointedBy( int o, IFilter* filter )
   if ( o != -1 ) {
     bitmap pto = qmats[I_PTED_MATRIX]->at(o);
     EXECUTE_IF_SET_IN_BITMAP( pto, 0, p, bi ) {
-      ans += iterate_equivalent_set( es2objs[p], filter );
+      ans += iterate_equivalent_set( es2ptrs[p], filter );
     }
   }
 
@@ -557,6 +553,7 @@ load_bitmap_index( FILE* fp, int index_type, bool t_mode )
   
   // Process the index body
   BitQS *bitqs = new BitQS(n, m, index_type, t_mode);
+  fprintf( stderr, "----------Index File Info----------\n" );
 
   if ( index_type == PT_MATRIX )
     bitqs->load_pt_index( fp );

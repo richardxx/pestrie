@@ -167,6 +167,7 @@ void
 execute_query_plan( IQuery *qs )
 {
   int x, y;
+  int ans = 0;
 
   FILE *fp = fopen( query_opts.query_plan, "r" );
   if ( fp == NULL ) {
@@ -198,9 +199,10 @@ execute_query_plan( IQuery *qs )
 	// No difference in PesTrie case
 	for ( int j = i + 1; j < n_query; ++j ) {
 	  y = pointers[j];
-	  bool ans = qs->IsAlias( x, y );
+	  bool res = qs->IsAlias( x, y );
 	  if ( query_opts.print_answers )
-	    printf( "(%d, %d) : %s\n", x, y, ans == true ? "true" : "false" );
+	    printf( "(%d, %d) : %s\n", x, y, res == true ? "true" : "false" );
+	  ans += (res?1:0);
 	}
       }
       break;
@@ -208,22 +210,25 @@ execute_query_plan( IQuery *qs )
     case LIST_POINTS_TO:
       {
 	x = pointers[i];
-	int ans = qs->ListPointsTo( x, ptr_filter );
+	int res = qs->ListPointsTo( x, ptr_filter );
 	if ( query_opts.print_answers )
-	  printf( "%d : %d\n", x, ans );
+	  printf( "%d : %d\n", x, res );
+	ans += res;
       }
       break;
       
     case LIST_ALIASES:
       {
-	int ans = qs->ListAliases( i, ptr_filter );
+	int res = qs->ListAliases( i, ptr_filter );
 	if ( query_opts.print_answers )
-	  printf( "%d : %d\n", x, ans );
+	  printf( "%d : %d\n", x, res );
+	ans += res;
       }
       break;
     }
   }
 
+  fprintf( stderr, "\nReference answer = %d\n", ans );
   delete ptr_filter;
 }
 
@@ -261,7 +266,7 @@ traverse_result( IQuery *qs )
 
   AllAcceptFilter* ptr_filter = new AllAcceptFilter;
 
-  for ( int i = 0; i < 10; ++i ) {
+  for ( int i = 0; i < n_query; ++i ) {
     //x = queries[i];
     x = i;
 
