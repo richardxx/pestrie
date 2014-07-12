@@ -40,13 +40,14 @@
 
 /*
   2008-09-22 (0.1.0): The initial version.
-  2010-04-29 (0.2.0): Better support for C++, by richardxx 
+  2010-04-29 (0.2.0): Better support for C++, by Xiao Xiao
+  2014 (0.3): C++ version is significantly enhanced, by Xiao Xiao
 */
 
 #ifndef AC_KVEC_H
 #define AC_KVEC_H
 
-#define INITIAL_SIZE 5
+#define INITIAL_SIZE 3
 
 #ifdef __cplusplus
 
@@ -74,15 +75,16 @@ T* realloc( T* pin, int sz1, int sz2 )
 template<typename T>
 class fast_vec_t
 {
-public:
+private:
   size_t n, m;
   T *a;
   
+public:
   fast_vec_t()
   {
     n = m = 0;
     a = NULL;
-    resize( INITIAL_SIZE );
+    //resize( INITIAL_SIZE );
   }
 
   fast_vec_t(int sz)
@@ -101,7 +103,8 @@ public:
   
   ~fast_vec_t()
   {
-    delete[] a;
+    if ( a != NULL )
+      delete[] a;
   }
 
   void copy( fast_vec_t<T> &other ) 
@@ -151,7 +154,7 @@ public:
   T& operator[](int inx) { return a[inx]; }
   T& at( int inx ) { return a[inx]; }
   T& back() { return a[n-1]; }
-
+  
   void set( int inx, T& v ) { a[inx] = v; }
   void reset_end( int inx ) {
     if ( inx <= m )
@@ -165,7 +168,7 @@ public:
   void push_back( const T &x )
   {
     if ( n == m ) {
-      int s = (m << 1) + 3;
+      int s = (m << 1) + 5;
       resize(s);
     }
     

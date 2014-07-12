@@ -1,3 +1,7 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
  * The querying system for the sparse bitmap points-to/side-effect index.
  *
@@ -9,7 +13,6 @@
 
 #include <cstdio>
 #include <cstring>
-#include <vector>
 #include <set>
 #include "options.hh"
 #include "profile_helper.h"
@@ -294,8 +297,7 @@ BitQS::ListAliases( int x, IFilter* filter )
     bitmap res = NULL;
     bitmap_iterator bi;
 
-    //    if ( !trad_mode )
-      res = qmats[I_ALIAS_MATRIX]->at(x);
+    res = qmats[I_ALIAS_MATRIX]->at(x);
     
     // We compute the result immediately
     if ( res == NULL ) {
@@ -308,8 +310,7 @@ BitQS::ListAliases( int x, IFilter* filter )
     	bitmap_ior_into( res, ptedm->at(o) );
       }
       
-      //      if ( !trad_mode )
-	qmats[I_ALIAS_MATRIX]->set(x, res);
+      qmats[I_ALIAS_MATRIX]->set(x, res);
     }
     
     // Extract the base pointers as the answer
@@ -320,54 +321,6 @@ BitQS::ListAliases( int x, IFilter* filter )
   
   return ans;
 }
-
-/*
-int
-ListAliases_by_pointers( BitQS *bitqs, int i, VECTOR(int) &pointers )
-{
-  int ans = 0;
-  unsigned q;
-  bitmap_iterator bi;
-  bitmap res;
-
-  int x = pointers[i];
-  x = bitqs->pt_map[x];
-
-  if ( x != -1 ) {
-    Cmatrix **qmats = bitqs->qmats;
-    res = qmats[I_ALIAS_MATRIX]->at(x);
-
-    // We compute the result immediately
-    if ( res == NULL ) {
-      Cmatrix *ptm = qmats[I_PT_MATRIX];
-      bitmap ptx = ptm->at(x);
-      res = BITMAP_ALLOC(NULL);
-
-      int size = pointers.size();
-      for ( int j = i + 1; j < size; ++j ) {
-	int y = pointers[j];
-	y = bitqs->pt_map[y];
-	if ( y == -1 ) continue;
-	
-	bitmap pty = ptm->at(y);
-	if ( bitmap_same_bit_p( ptx, pty ) != 0 )
-	  bitmap_set_bit( res, y );
-      }
-      
-      // The bits set in res are not the representatives but the individual pointers
-      qmats[I_ALIAS_MATRIX]->set(x, res);
-    }
-    
-    // visit
-    EXECUTE_IF_SET_IN_BITMAP( res, 0, q, bi ) {
-      if ( q >= 0 )
-	++ans;
-    }
-  }
-  
-  return ans;
-}
-*/
 
 int 
 BitQS::ListModRefVars( int x, IFilter* filter )

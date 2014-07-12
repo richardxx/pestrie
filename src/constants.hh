@@ -1,5 +1,9 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
- * This section defines the global options for both bitmap and PesTrie index.
+ * Define the global options for both bitmap and PesTrie index.
  * by richardxx, 2012.9
  */
 

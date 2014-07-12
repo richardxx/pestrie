@@ -1,21 +1,23 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
  * Implementation of the PesTrie based algorithm.
  * The PesTrie algorithm is basically designed for computing and querying the result of A*trans(A), when the data have skewness property.
  * It can also be extended to compute general matrix multiplication A*B.
  * We try our best to optimize the code in terms of performance and code length.
  *
- * Initial idea & skeleton 2009.9
- * Improved 2010.6: building the rectangle based index
- * Improved 2012.7: supporting for indexing the side-effect matrix
- * Improved 2012.9: refactoring code to be more extendable
+ * 2012.7: initial idea and prototype
+ * 2012.9: modularize
  */
 #ifndef PESTRIE_H
 #define PESTRIE_H
 
-#include <vector>
 #include "bitmap.h"
 #include "segtree.hh"
 #include "constants.hh"
+#include <vector>
 
 struct PesOpts 
 {
@@ -73,7 +75,7 @@ struct MatrixRow
 class PesTrie
 {
 public:
-  // Used to self-identification
+  // Used for self-identification
   int index_type;
 
   // Input matrix and its descriptions

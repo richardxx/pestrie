@@ -1,5 +1,9 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
- * A driver that demonstrates the use of the PesTrie for index building.
+ * A driver for constructing Pestrie index.
  * Initiated 2012.9
  */
 #include <cstdio>

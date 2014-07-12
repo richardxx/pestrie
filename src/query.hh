@@ -1,7 +1,11 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
- * A header that defines the interface for answering queries.
- *
- * by richardxx, 2011.8
+ * A header that defines the interface for all kinds of persistence scheme.
+ * 2011.8: initial
+ * 2014.5: improved
  */
 
 #ifndef QUERY_H

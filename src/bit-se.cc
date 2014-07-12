@@ -1,6 +1,9 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
  * Building sparse bitmap index for side-effect matrix.
- *
  * by richardxx, 2012.10
  */
 

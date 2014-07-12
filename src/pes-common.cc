@@ -1,13 +1,15 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
- * The common procedures for manipulating PesTrie.
+ * The common procedures for building Pestrie persistence.
  * By richardxx, 2012.9
  */
 
 #include <vector>
 #include <cmath>
-#include <algorithm>
 #include <ctime>
-#include <cassert>
 #include <cstring>
 #include "segtree.hh"
 #include "histogram.hh"
@@ -16,7 +18,6 @@
 #include "matrix-ops.hh"
 
 using namespace std;
-
 
 /*
  * Two objects are equivalent if they are always pointed to by the same pointers.

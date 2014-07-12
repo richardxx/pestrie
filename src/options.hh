@@ -1,5 +1,9 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
- * Replacable implementations.
+ * Macros, constants, and variables that are used as switches.
  * By richardxx, 2014.5
  */
 
@@ -10,7 +14,7 @@
 #define VECTOR(T) kvec_t(T)
 
 //#include <vector>
-//#define VECTOR(T) vector<T>
+//#define VECTOR(T) std::vector<T>
 
 
 #endif

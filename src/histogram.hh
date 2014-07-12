@@ -1,5 +1,9 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
- * A histogram visualizer, an enhanced version from my Java implementation.
+ * A histogram visualizer.
  * By richardxx, 2011.9
  */
 

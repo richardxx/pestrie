@@ -1,10 +1,11 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
- * An sparse bitmap based external index for pointer information.
+ * An sparse bitmap based persistence scheme for pointer information.
+ * The equivalent pointers and objects are detected by hashing.
  * 
- * Features:
- * 1. The equivalent pointers and objects are detected with William Weihl's algorithm, presented in his POPL81 paper;
- * 2. A row of the AM, LL and LS matrices are calculated each time.
- 
  * By richardxx,
  * initial, 2009.9
  * modified, 2012.7

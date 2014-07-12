@@ -1,3 +1,7 @@
+// Copyright 2014, Xiao Xiao. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /*
  * Processing the PesTrie index to serve queries.
  *
@@ -10,13 +14,11 @@
 
 #include <cstdio>
 #include <cstring>
-#include <vector>
 #include <algorithm>
 #include <ctime>
 #include <cassert>
 #include "options.hh"
 #include "shapes.hh"
-//#include "bitmap.h"
 #include "query.hh"
 #include "query-inl.hh"
 #include "profile_helper.h"
