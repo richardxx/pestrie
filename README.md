@@ -17,4 +17,4 @@
 
 3. Other usages of this code:
 
-   In fact, Pestrie is approach to compute, encode, and query the boolean matrix multiplication of A*transpose(A). Pestrie can also be generalized to compute the product A*B for two different matrices. Both are implemented in our code ("pes-self.cc" and "pes-dual.cc").
+   In fact, Pestrie is an approach to compute, encode, and query the boolean matrix multiplication of A*transpose(A). Pestrie can also be generalized to compute the product A*B for two different matrices. Both are implemented in our code ("pes-self.cc" and "pes-dual.cc").
