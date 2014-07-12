@@ -14,3 +14,7 @@
    5. Use "pesI antlr.ptm antlr.ptp" to generate the Pestrie persistence. Replace "pesI" with "bitI" to generate the bitmap persistence;
    6. use "qtester -t1 antlr.ptp" to test the querying efficiency for alias query. Use "qtester -t1 antlr.ptp basePtrs.in" to calculate the alias pairs with the pointers given in "basePtrs.in";
    7. Type "qtester" to get help with other queries.
+
+3. Other usages of this code:
+
+   In fact, Pestrie is approach to compute, encode, and query the boolean matrix multiplication of A*transpose(A). Pestrie can also be generalized to compute the product A*B for two different matrices. Both are implemented in our code ("pes-self.cc" and "pes-dual.cc").
