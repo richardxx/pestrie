@@ -1,11 +1,14 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 /*
  * A driver for constructing Pestrie index.
- * Initiated 2012.9
+ *
+ * by Xiao Xiao,
+ * initial: 2012.9
  */
+
 #include <cstdio>
 #include <unistd.h>
 #include <cstdlib>

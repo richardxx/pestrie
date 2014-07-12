@@ -1,6 +1,7 @@
 1. What's in the package?
-   
+
    src/:	the source code of Pestrie and bitmap persistence schemes
+   
    test/:   	sample data for testing the code
 
 

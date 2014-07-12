@@ -1,15 +1,15 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 /*
  * An sparse bitmap based persistence scheme for pointer information.
  * The equivalent pointers and objects are detected by hashing.
- * 
- * By richardxx,
- * initial, 2009.9
- * modified, 2012.7
- * refactored & modified, 2012.10
+ *
+ * by Xiao Xiao
+ * initial: 2009.9
+ * modified: 2012.7
+ * refactored & modified: 2012.10
  */
 
 #include <cstdio>

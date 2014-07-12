@@ -1,11 +1,12 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 /*
  * Processing the PesTrie index to serve queries.
  *
- * Initiated 2011.8
+ * by Xiao Xiao
+ * Initial: 2011.8
  * Improved 2012.7: improve the alias query to O(lgn) practical performance.
  * Improved 2012.10: fix bugs and code refactoring.
  * Improved 2014.02: fix bugs and improve performance.

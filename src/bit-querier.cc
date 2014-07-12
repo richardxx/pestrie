@@ -1,14 +1,14 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 /*
  * The querying system for the sparse bitmap points-to/side-effect index.
  *
- * by richardxx,
- * initial, 2011.9
- * enhancement, 2012.7
- * refactor, 2012.10
+ * by Xiao Xiao,
+ * initial: 2011.9
+ * enhancement: 2012.7
+ * refactor: 2012.10
  */
 
 #include <cstdio>

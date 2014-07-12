@@ -1,4 +1,4 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,7 +6,10 @@
  * Define the shapes.
  * Only vertical line and rectangle are defined. 
  * We represent point and horizontal line by vertical line and rectangle representatively to obtain better querying performance.
- * By richardxx, 2014.4
+ 
+ * by Xiao Xiao
+ * initial: 2012.7
+ * improve: 2014.2
  */
 
 #ifndef SHAPE_H

@@ -1,11 +1,13 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 /*
  * The segment tree based structure for storing figures.
- * By richardxx, 2010.6
- * Updated, 2012.9
+ *
+ * by Xiao Xiao
+ * initial: 2012.7
+ * improve: 2012.9
  */
 
 #ifndef SEGTREE_H

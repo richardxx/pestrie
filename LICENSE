@@ -1,11 +1,20 @@
-This software uses code from other projects, which have their own licences:
+This software uses code from other projects, which have their own licenses:
 
-     -Bitmap library from GCC, including the files bitmap.{h, cc}, obstack.{h, cc}. It uses the GPL 2.0 licence.
+     -Bitmap library from GCC, including the files bitmap.{h, cc}, obstack.{h, cc}. It uses the GPL 2.0 license.
 
-     -kvec library from Attractive Chaos, including the file kvec.hh. It uses the MIT licence.
+     -kvec library from Attractive Chaos, including the file kvec.hh. It uses the MIT license.
 
-Copyright (c) 2014, Xiao Xiao.
+------------------------------
+Pestrie Release License
+------------------------------
+Copyright (c) 2014, Hong Kong University of Science and Technology.
 All rights reserved.
+
+Project members:
+     Xiao Xiao, code maintainer, richardxx@cse.ust.hk
+     Qirun Zhang, qrzhang@cse.ust.hk
+     Jinguo Zhou, andyzhou@cse.ust.hk
+     Charles Zhang, advisor, charlesz@cse.ust.hk
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 

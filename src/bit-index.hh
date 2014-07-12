@@ -1,10 +1,12 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 /*
  * The library interface for constructing sparse bitmap based persistence scheme.
- * By richardxx, 2012.10
+ 
+ * By Xiao Xiao
+ * initial 2012.10
  */
 
 #ifndef BIT_INDEX_H

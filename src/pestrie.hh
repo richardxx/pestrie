@@ -1,4 +1,4 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -8,8 +8,9 @@
  * It can also be extended to compute general matrix multiplication A*B.
  * We try our best to optimize the code in terms of performance and code length.
  *
- * 2012.7: initial idea and prototype
- * 2012.9: modularize
+ * by Xiao Xiao
+ * initial 2012.7: idea and prototype
+ * improve 2012.9: modularize
  */
 #ifndef PESTRIE_H
 #define PESTRIE_H

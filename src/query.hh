@@ -1,11 +1,13 @@
-// Copyright 2014, Xiao Xiao. All rights reserved.
+// Copyright 2014, Hong Kong University of Science and Technology. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 /*
  * A header that defines the interface for all kinds of persistence scheme.
- * 2011.8: initial
- * 2014.5: improved
+ * 
+ * by Xiao Xiao
+ * initial 2012.7
+ * improve 2014.5
  */
 
 #ifndef QUERY_H
