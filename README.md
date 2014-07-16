@@ -11,9 +11,10 @@
    2. You can optionally "make install". By default the binaries will be copied to $HOME/bin;
    3. Go to "src/antlr";
    4. Uncompress the file "antlr.ptm.bz2";
-   5. Use "pesI antlr.ptm antlr.ptp" to generate the Pestrie persistence. Replace "pesI" with "bitI" to generate the bitmap persistence;
-   6. use "qtester -t1 antlr.ptp" to test the querying efficiency for alias query. Use "qtester -t1 antlr.ptp basePtrs.in" to calculate the alias pairs with the pointers given in "basePtrs.in";
-   7. Type "qtester" to get help with other queries.
+   5. Use "pesI antlr.ptm antlr.ptp" to generate the Pestrie persistence file "antlr.ptp". Correspondingly, use "bitI antlr.ptm antlr.ptb" to generate the bitmap persistence file "antlr.ptb";
+   6. Use "qtester -t1 antlr.ptp" to test the querying efficiency for alias query. Use "qtester -t1 antlr.ptp basePtrs.in" to calculate the alias pairs with the pointers given in "basePtrs.in". Replacing "antlr.ptp" with "antlr.ptb" will enter the bitmap based querying system;
+   7. Type "qtester" without parameters to gain help with other queries.
+
 
 3. Other usages of this code:
 
