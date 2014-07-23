@@ -42,13 +42,17 @@ static void
 push_and_merge( VECTOR(VLine*) &rects, VLine* p )
 {
   if ( rects.size() != 0 ) {
+    // Return a reference to the last entry
     VLine* &vlast = rects.back();
     if ( vlast->y2 + 1 == p->y1 ) {
-      // Concatenate them
-      // TODO: Memory leak
-      vlast = new VLine(vlast->y1, p->y2);
+      // Concatenate two rectangles
+      int y1 = vlast->y1;
+      // Be careful of memory leak (cannot be detected by Coverity)
+      delete vlast;
+      // This directly updates the last entry
+      vlast = new VLine(y1, p->y2);
       return;
-      }
+    }
   }
   
   rects.push_back(p);
@@ -341,6 +345,8 @@ SegTree::verify()
       p = p->parent;
     }
   }
+
+  return true;
 }
 
 
