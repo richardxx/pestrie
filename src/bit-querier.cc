@@ -50,7 +50,6 @@ public:
     n_of_mat = 0;
     n_ld = n_st = 0;
     n_es = 0;
-    pt_map = obj_map = NULL;
 
     if ( type == PT_MATRIX ) {
       n_of_mat = N_OF_PT_INDEX;
@@ -59,6 +58,8 @@ public:
     }
     else {
       n_of_mat = N_OF_SE_INDEX;
+      obj_map = NULL;
+      es2objs = NULL;
     }
     
     qmats = new Cmatrix*[n_of_mat];

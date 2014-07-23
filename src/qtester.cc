@@ -98,7 +98,8 @@ struct QueryOpts
 query_opts;
 
 // Program options
-static void print_help( const char* prog_name )
+static void 
+print_help( const char* prog_name )
 {
   printf( "Usage : %s [options] input_file [query_plan]\n", prog_name );
   printf( "Options  : \n" );
@@ -343,7 +344,8 @@ load_index()
   return qs;
 }
 
-int main( int argc, char** argv )
+int 
+main( int argc, char** argv )
 {
   if ( parse_options( argc, argv ) == 0 )
     return -1;
@@ -353,14 +355,13 @@ int main( int argc, char** argv )
 
   query_opts.query_plan != NULL ? 
     execute_query_plan(qs) : traverse_result(qs);
-  
-  delete qs;
 
   char buf[128];
   sprintf( buf, "%s querying (%s)", query_strs[query_opts.query_type],
 	   query_opts.trad_mode == true ? "on-demand" : "use-index" );
   show_res_use( buf );
 
+  delete qs;
   return 0;
 }
 

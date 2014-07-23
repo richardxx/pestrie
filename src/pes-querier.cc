@@ -43,13 +43,16 @@ push_and_merge( VECTOR(VLine*) &rects, VLine* p )
 {
   if ( rects.size() != 0 ) {
     // Return a reference to the last entry
+    // Update to vlast will be reflected to the last entry
     VLine* &vlast = rects.back();
     if ( vlast->y2 + 1 == p->y1 ) {
       // Concatenate two rectangles
       int y1 = vlast->y1;
-      // Be careful of memory leak (cannot be detected by Coverity)
-      delete vlast;
-      // This directly updates the last entry
+      /* 
+	 Warning:
+	 Could lead to a memory leak if vlast is the only pointer to the rectangle
+	 Can be solved by a manual reference counting but we didn't do it here
+      */
       vlast = new VLine(y1, p->y2);
       return;
     }
@@ -213,6 +216,7 @@ SegTree::__opt_seg_tree( SegNode* p )
     __opt_seg_tree( p->right );
 }
 
+// Merge sort, the result is given in list1
 static void
 merge_into( VECTOR(VLine*) &list1, VECTOR(VLine*) &list2 )
 {
@@ -235,13 +239,11 @@ merge_into( VECTOR(VLine*) &list1, VECTOR(VLine*) &list2 )
     if ( j == sz2 ||
 	 ( i < sz1 && r1->y1 < r2->y1 ) ) {
       push_and_merge( list3, r1 );
-      //list3.push_back(r1);
       ++i;
       if ( i < sz1 ) r1 = list1[i];
     }
     else {
       push_and_merge( list3, r2 );
-      //list3.push_back(r2);
       ++j;
       if ( j < sz2 ) r2 = list2[j];
     }
@@ -370,11 +372,6 @@ public:
   int getIndexType() { return index_type; }
 
 public:
-  void rebuild_mapping_info( FILE* );
-  void load_figures( FILE* );
-  void extract_pointsto(SegNode*);
-
-public:
   PesQS(int n_ptrs, int n_objs, int n_vertex, int type, int d_merging)
   {
     n = n_ptrs; m = n_objs; vertex_num = n_vertex;
@@ -387,6 +384,7 @@ public:
     root_tree = new int[n_vertex];
     es2ptrs = new VECTOR(int)[n_vertex];
     qtree = new SegTree(n_vertex);
+    es2objs = NULL;
 
     if ( type == PT_MATRIX ) {
       es2objs = new VECTOR(int)[n_vertex];
@@ -395,14 +393,21 @@ public:
 
   ~PesQS()
   {
-    delete[] tree;
-    delete[] preV;
-    delete[] root_prevs;
-    delete[] root_tree;
-    delete[] es2ptrs;
-    delete qtree;
-    if ( index_type == PT_MATRIX ) delete es2objs;
+    if ( qtree != NULL ) delete qtree;
+    if ( tree != NULL ) delete[] tree;
+    if ( preV != NULL ) delete[] preV;
+    if ( root_prevs != NULL ) delete[] root_prevs;
+    if ( root_tree != NULL ) delete[] root_tree;
+    if ( es2ptrs != NULL ) delete[] es2ptrs;
+    if ( es2objs != NULL ) delete[] es2objs;
   }
+  
+public:
+  void load_figures( FILE* );
+  
+private:
+  void rebuild_mapping_info( FILE* );
+  void extract_pointsto(SegNode*);
 
 private:
   SegTree* qtree;
@@ -505,6 +510,9 @@ PesQS::load_figures( FILE* fp )
   int *labels = new int[vertex_num * 3];
   VECTOR(Rectangle*) all_rects(vertex_num);
 
+  // We rebuild the mapping between pointers to Pestrie constructs
+  rebuild_mapping_info(fp);
+
   // Loading and processing each figure
   for ( int x1 = 0; x1 < vertex_num; ++x1 ) {
     fread( &n_labels, sizeof(int), 1, fp );
@@ -567,38 +575,14 @@ PesQS::load_figures( FILE* fp )
   }
 
   int size = all_rects.size();
-  /*
-  for ( int i = 0; i < size; ++i ) {
-    Rectangle* r = all_rects[i];
-    assert( r->x1 <= r->x2 );
-    assert( r->x2 <= r->y1 );
-    assert( r->y1 <= r->y2 );
-  }
-  */
 
   // We sort the cached figures by y1
   sort( all_rects.begin(), all_rects.end(), comp_rect );
-
-  /*
-  for ( int i = 0; i < size; ++i ) {
-    Rectangle* r = all_rects[i];
-    assert( r->x1 <= r->x2 );
-    assert( r->x2 <= r->y1 );
-    assert( r->y1 <= r->y2 );
-  }
-  */
 
   // We insert the cached figures
   int lasty = -1;
   for ( int i = 0; i < size; ++i ) {
     Rectangle* r = all_rects[i];
-    /*
-    if ( r->y1 < lasty ) {
-      fprintf( stderr, "Sort error! Index = %d\n", i );
-      assert( r->y1 >= lasty );
-    }
-    lasty = r->y1;
-    */
     qtree->insert_rect( r->x1, r->x2, r );
   }
 
@@ -606,8 +590,10 @@ PesQS::load_figures( FILE* fp )
   qtree->optimize_seg_tree();
   delete[] labels;
 
-  //qtree->verify();
-
+#ifdef DEBUG
+  qtree->verify();
+#endif
+  
   // Profile
   int non_empty_nodes = 0;
   int internal_pairs = 0;
@@ -831,7 +817,6 @@ load_pestrie_index(FILE* fp, int index_type, bool d_merging )
   fprintf( stderr, "----------Index File Info----------\n" );
 
   // Loading and decoding the persistence file
-  pesqs->rebuild_mapping_info(fp);
   pesqs->load_figures(fp);
   
   return pesqs;
