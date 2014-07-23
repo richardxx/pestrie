@@ -50,14 +50,16 @@ remove_node( TreapNode* p )
 {
   // case 1
   if ( p->left == NULL ) {
+    TreapNode* right = p->right;
     delete p;
-    return p->right;
+    return right;
   }
   
   // case 2
   if ( p->right == NULL ) {
+    TreapNode* left = p->left;
     delete p;
-    return p->left;
+    return left;
   }
   
   // case 3

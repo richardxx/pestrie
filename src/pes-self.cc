@@ -227,6 +227,7 @@ PesTrieSelf::build_index()
   
   delete[] groups;
   delete[] Queue;
+  delete[] vis;
 
   return 0;
 }

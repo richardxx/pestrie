@@ -92,8 +92,9 @@ parse_options( int argc, char **argv )
       pes_opts->obj_merge = false;
       break;
 
-    case 'h':     
+    case 'h':
       print_help(argv[0]);
+      delete pes_opts;
       return NULL;
       
     default:

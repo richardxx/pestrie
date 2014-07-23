@@ -59,11 +59,15 @@ public:
   virtual int ListConflicts( int x, IFilter* filter ) = 0;
 
 public:
+  // Obtain the basic information of the persistent index
   virtual int getPtrEqID(int x) = 0;
   virtual int getObjEqID(int x) = 0;
   virtual int nOfPtrs() = 0;
   virtual int nOfObjs() = 0;
   virtual int getIndexType() = 0;
+
+public:
+  virtual ~IQuery() {}
 };
 
 // Generating the querying instance

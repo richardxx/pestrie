@@ -129,6 +129,8 @@ compress_equivalent_rows( Cmatrix* A )
   A -> mat = mat;
   A -> r_reps = r_reps;
   A -> n_r_reps = n_r_reps;
+
+  delete[] HT;
 }
 
 // First we compute the transpose
