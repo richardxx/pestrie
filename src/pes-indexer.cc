@@ -209,9 +209,10 @@ main( int argc, char** argv )
     FILE *fp = fopen( output_file, "wb" );
     if ( fp == NULL )
       fprintf( stderr, "Cannot write to the file: %s\n", output_file );
-    else
+    else {
       pestrie->externalize_index( fp, magic_numbers[matrix_type] );
-    fclose(fp);
+      fclose(fp);
+    }
   }
 
   if ( interactive_query )
